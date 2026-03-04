@@ -1,0 +1,7 @@
+/* Main Styles - Import all CSS files */
+
+@import './variables.css';
+@import './reset.css';
+@import './base.css';
+@import './utilities.css';
+@import '../../styles/formAnimations.css';

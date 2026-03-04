@@ -1,0 +1,67 @@
+package com.stage.auth.authbackend.controller.user;
+
+import com.stage.auth.authbackend.dto.user.ChangePasswordRequest;
+import com.stage.auth.authbackend.dto.user.UpdateProfileRequest;
+import com.stage.auth.authbackend.dto.user.UserDTO;
+import com.stage.auth.authbackend.entity.User;
+import com.stage.auth.authbackend.exception.ApiException;
+import com.stage.auth.authbackend.repository.UserRepository;
+import com.stage.auth.authbackend.service.user.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
+public class UserController {
+
+    private final UserRepository userRepository;
+    private final UserService userService; // <-- MISSING FIELD (now added)
+
+    @GetMapping("/me")
+    public UserDTO getMe(Authentication authentication) {
+
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+
+        return UserDTO.builder()
+                .id(user.getId())
+                .nom(user.getNom())
+                .prenom(user.getPrenom())
+                .email(user.getEmail())
+                .telephone(user.getTelephone())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole().name())
+                .etatCompte(user.getEtatCompte())
+                .enabled(user.isEnabled())
+                .dateDeNaissance(user.getDateDeNaissance())
+                .niveau(user.getNiveau())
+                .scoreTotal(user.getScoreTotal())
+                .pointsExperience(user.getPointsExperience())
+                .dateCreation(user.getDateCreation())
+                .dateDerniereConnexion(user.getDateDerniereConnexion())
+                .build();
+    }
+
+    @PutMapping("/update-profile")
+    public UserDTO updateProfile(Authentication authentication,
+                                 @RequestBody UpdateProfileRequest request) {
+        return userService.updateProfile(authentication, request);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            Authentication authentication,
+            @RequestBody ChangePasswordRequest request
+    ) {
+        userService.changePassword(authentication, request);
+        return ResponseEntity.ok(Map.of("message", "Mot de passe changé"));
+    }
+
+
+}
