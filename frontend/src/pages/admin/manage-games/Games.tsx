@@ -3,8 +3,8 @@ import { motion } from 'motion/react';
 import { Plus, Edit, Trash2, Loader2, Gamepad2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import adminApi from '@/api/admin.api';
-import type { GameDTO } from '@/api/api.types';
+import adminApi from '@/api/admin';
+import type { GameDTO } from '@/api/types';
 
 const TYPE_ICONS: Record<string, string> = {
   QUIZ: '🧮',

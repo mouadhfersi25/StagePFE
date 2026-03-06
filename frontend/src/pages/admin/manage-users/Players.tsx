@@ -4,7 +4,7 @@ import { Search, Filter, Eye, Ban, Check, X, Loader2, UserCheck, ArrowUpDown, Ar
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/context';
 import type { UserDTO } from '@/data/types';
-import adminApi from '@/api/admin.api';
+import adminApi from '@/api/admin';
 
 export default function Players() {
   const { user: currentUser } = useAuth();

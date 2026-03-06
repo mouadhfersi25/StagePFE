@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router';
 import { userService } from '@/services/user.service';
 import storage from '@/utils/storage';
 import type { UserDTO } from '@/data/types';
-import type { UpdateProfileRequest } from '@/api/api.types';
+import type { UpdateProfileRequest } from '@/api/types';
 
 const MAX_IMAGE_SIZE_MB = 2;
 const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp,image/gif';

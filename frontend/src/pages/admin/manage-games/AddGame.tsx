@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAdminData } from '@/context';
 import type { Game } from '@/data/types';
-import type { CreateGameRequest, TypeJeu, ModeJeu } from '@/api/api.types';
-import adminApi from '@/api/admin.api';
+import type { CreateGameRequest, TypeJeu, ModeJeu } from '@/api/types';
+import adminApi from '@/api/admin';
 
 const icons = ['🎮', '🧮', '🧠', '🎯', '⚡', '🔬', '🦁', '🌟', '🚀', '🎨'];
 

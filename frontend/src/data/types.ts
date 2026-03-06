@@ -1,7 +1,7 @@
 // Types (données réelles via API)
-// UserDTO et types requêtes/réponses API : @/api/api.types.ts
+// UserDTO et types requêtes/réponses API : @/api/types
 
-export type { UserDTO } from '@/api/api.types';
+export type { UserDTO } from '@/api/types';
 
 export interface User {
   id: string;

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
-import adminApi from '@/api/admin.api';
+import adminApi from '@/api/admin';
 import { useAuth } from '@/context';
 import type { UserDTO } from '@/data/types';
 

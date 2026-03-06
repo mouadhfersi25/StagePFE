@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, Trophy, Target, Zap, Mail, Phone, Loader2, User, C
 import { useNavigate, useParams } from 'react-router';
 import { useAuth } from '@/context';
 import type { UserDTO } from '@/data/types';
-import adminApi from '@/api/admin.api';
+import adminApi from '@/api/admin';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';

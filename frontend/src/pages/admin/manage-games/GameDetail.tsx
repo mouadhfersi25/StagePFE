@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calendar, Edit, Loader2, Tag, Target, Zap } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
-import adminApi from '@/api/admin.api';
-import type { GameDTO } from '@/api/api.types';
+import adminApi from '@/api/admin';
+import type { GameDTO } from '@/api/types';
 
 const TYPE_ICONS: Record<string, string> = {
   QUIZ: '🧮',

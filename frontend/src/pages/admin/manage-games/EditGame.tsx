@@ -3,8 +3,8 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
-import adminApi from '@/api/admin.api';
-import type { GameDTO, UpdateGameRequest, TypeJeu, ModeJeu } from '@/api/api.types';
+import adminApi from '@/api/admin';
+import type { GameDTO, UpdateGameRequest, TypeJeu, ModeJeu } from '@/api/types';
 
 const ICONS = ['🎮', '🧮', '🧠', '🎯', '⚡', '🔬', '🦁', '🌟', '🚀', '🎨'];
 

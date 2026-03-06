@@ -2,7 +2,7 @@ import { useState, useEffect, use } from 'react';
 import { motion } from 'motion/react';
 import { Users, Gamepad2, Play, Award, TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context';
-import adminApi from '@/api/admin.api';
+import adminApi from '@/api/admin';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
