@@ -34,17 +34,9 @@ public class User {
     @Column(nullable = false)
     private LocalDate dateDeNaissance;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private boolean enabled = false;
-
-    // Gamification (uniquement JOUEUR) => champs nullable
-    private Integer niveau;
-    private Integer scoreTotal;
-    private Integer pointsExperience;
-
-    @Column(columnDefinition = "TEXT")
+    @Column
     private String avatarUrl;
+
     private String telephone;
 
     @Enumerated(EnumType.STRING)
@@ -55,6 +47,23 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private EtatCompte etatCompte = EtatCompte.ACTIF;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean enabled = false;
+
+    // Gamification (uniquement JOUEUR) => champs nullable
+    private Integer niveau;
+    private Integer scoreTotal;
+    private Integer pointsExperience;
+
+    @ManyToOne
+    @JoinColumn(name = "id_region")
+    private Region region;
+
+    @ManyToOne
+    @JoinColumn(name = "id_genre")
+    private Genre genre;
 
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
@@ -84,3 +93,4 @@ public class User {
         }
     }
 }
+

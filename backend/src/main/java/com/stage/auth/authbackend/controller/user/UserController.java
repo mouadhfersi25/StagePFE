@@ -34,6 +34,7 @@ public class UserController {
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
                 .email(user.getEmail())
+                .password(null)
                 .telephone(user.getTelephone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole().name())
@@ -43,8 +44,14 @@ public class UserController {
                 .niveau(user.getNiveau())
                 .scoreTotal(user.getScoreTotal())
                 .pointsExperience(user.getPointsExperience())
-                .dateCreation(user.getDateCreation())
+                .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
+                .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
+                .resetToken(user.getResetToken())
+                .resetTokenExpiry(user.getResetTokenExpiry())
+                .tokenVerification(user.getTokenVerification())
+                .dateExpirationToken(user.getDateExpirationToken())
                 .dateDerniereConnexion(user.getDateDerniereConnexion())
+                .dateCreation(user.getDateCreation())
                 .build();
     }
 

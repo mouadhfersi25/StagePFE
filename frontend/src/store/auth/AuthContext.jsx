@@ -10,7 +10,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (token) {
-      setUser({ email: "logged_user" }); // ⚠ à remplacer lorsque tu fera /me
+      const email = localStorage.getItem("auth_email");
+      const role = localStorage.getItem("auth_role");
+      setUser(email ? { email, role: role || undefined } : { email: "logged_user" });
     }
   }, [token]);
 

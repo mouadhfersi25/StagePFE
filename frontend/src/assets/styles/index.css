@@ -1,7 +1,8 @@
-/* Main Styles - Import all CSS files */
+/* Styles principaux – Tailwind (template EduGame) en priorité.
+   On n’importe pas reset/base/utilities pour ne pas bloquer le CSS du template. */
 
 @import './variables.css';
-@import './reset.css';
-@import './base.css';
-@import './utilities.css';
+@import './minimal.css';
+@import './legacy-pages.css';
 @import '../../styles/formAnimations.css';
+@import '../../styles/tailwind.css';

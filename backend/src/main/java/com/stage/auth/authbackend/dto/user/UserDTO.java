@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * DTO en correspondance stricte à 100 % avec la table users.
+ * Le champ password est toujours null en réponse API (sécurité).
+ */
 @Getter
 @Setter
 @AllArgsConstructor
@@ -18,13 +22,14 @@ public class UserDTO {
     private String nom;
     private String prenom;
     private String email;
+    /** Ne jamais remplir en réponse API (toujours null). */
+    private String password;
+
     private String telephone;
     private String avatarUrl;
 
     private String role;
-
     private EtatCompte etatCompte;
-
     private boolean enabled;
 
     private LocalDate dateDeNaissance;
@@ -33,6 +38,16 @@ public class UserDTO {
     private Integer scoreTotal;
     private Integer pointsExperience;
 
-    private LocalDateTime dateCreation;
+    /** id_region (FK vers regions) */
+    private Long idRegion;
+    /** id_genre (FK vers genres) */
+    private Long idGenre;
+
+    private String resetToken;
+    private LocalDateTime resetTokenExpiry;
+    private String tokenVerification;
+    private LocalDateTime dateExpirationToken;
+
     private LocalDateTime dateDerniereConnexion;
+    private LocalDateTime dateCreation;
 }

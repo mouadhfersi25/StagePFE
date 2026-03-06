@@ -70,9 +70,15 @@ export default function LoginForm() {
       const roleFromStorage = (typeof localStorage !== "undefined" ? (localStorage.getItem("auth_role") || "") : "").toUpperCase();
       const role = roleFromResponse || roleFromStorage;
       
-      // Redirection par rechargement pour que AdminRoute lise bien le localStorage
+      // Redirection par rôle vers les dashboards template EduGame ou dashboard existant
       if (role === ROLES.ADMIN) {
         window.location.href = "/admin/dashboard";
+      } else if (role === ROLES.JOUEUR) {
+        window.location.href = "/player/dashboard";
+      } else if (role === ROLES.EDUCATEUR) {
+        window.location.href = "/educator/dashboard";
+      } else if (role === ROLES.PARENT) {
+        window.location.href = "/parent/dashboard";
       } else {
         window.location.href = "/dashboard";
       }

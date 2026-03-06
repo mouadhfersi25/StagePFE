@@ -13,3 +13,13 @@ export const USER_ENDPOINTS = {
   UPDATE_PROFILE: "/users/update-profile",
   CHANGE_PASSWORD: "/users/change-password",
 };
+
+export const ADMIN_ENDPOINTS = {
+  USERS: "/admin/users",
+  USER_BY_ID: (id) => `/admin/users/${id}`,
+  SUSPEND_USER: (id) => `/admin/users/suspend/${id}`,
+  REACTIVATE_USER: (id) => `/admin/users/reactivate/${id}`,
+  USER_ROLE: (id) => `/admin/users/${id}/change-role`,
+  GAMES: "/admin/games",
+  GAME_BY_ID: (id) => `/admin/games/${id}`,
+};

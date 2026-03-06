@@ -14,13 +14,11 @@ export const userService = {
     if (res.data.email) {
       storage.set("auth_email", res.data.email);
     }
-    // Garder l'avatar en cache local pour mise à jour instantanée du header
-    if (Object.prototype.hasOwnProperty.call(res.data, "avatarUrl")) {
-      if (res.data.avatarUrl) {
-        storage.set("auth_avatar", res.data.avatarUrl);
-      } else {
-        storage.remove("auth_avatar");
-      }
+    if (res.data.prenom != null) {
+      storage.set("auth_prenom", res.data.prenom);
+    }
+    if (res.data.nom != null) {
+      storage.set("auth_nom", res.data.nom);
     }
     return res.data;
   },
