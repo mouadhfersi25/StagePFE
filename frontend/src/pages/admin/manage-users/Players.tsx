@@ -235,16 +235,6 @@ export default function Players() {
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Niveau</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Score total</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">État compte</th>
-                      <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">
-                        <button
-                          type="button"
-                          onClick={() => toggleSort('date')}
-                          className="inline-flex items-center gap-1.5 hover:text-orange-600 transition-colors"
-                        >
-                          Date création
-                          {sortBy === 'date' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 text-gray-400" />}
-                        </button>
-                      </th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
@@ -320,7 +310,6 @@ export default function Players() {
                             {user.etatCompte}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-sm text-gray-600">{formatDate(user.dateCreation)}</td>
                         <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
                             <motion.button

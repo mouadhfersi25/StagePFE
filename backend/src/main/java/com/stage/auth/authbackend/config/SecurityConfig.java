@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/countriesnow/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/error"
@@ -45,7 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
 
-                        // ➤ Autoriser tous les utilisateurs authentifiés
+                        // ➤ Utilisateurs authentifiés
                         .requestMatchers("/api/users/**").authenticated()
                         .anyRequest().authenticated()
                 )

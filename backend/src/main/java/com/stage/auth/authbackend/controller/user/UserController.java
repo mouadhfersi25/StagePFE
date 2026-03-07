@@ -1,6 +1,7 @@
 package com.stage.auth.authbackend.controller.user;
 
 import com.stage.auth.authbackend.dto.user.ChangePasswordRequest;
+import com.stage.auth.authbackend.dto.user.PlayerOnboardingRequest;
 import com.stage.auth.authbackend.dto.user.UpdateProfileRequest;
 import com.stage.auth.authbackend.dto.user.UserDTO;
 import com.stage.auth.authbackend.entity.User;
@@ -45,6 +46,8 @@ public class UserController {
                 .scoreTotal(user.getScoreTotal())
                 .pointsExperience(user.getPointsExperience())
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
+                .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
                 .resetToken(user.getResetToken())
                 .resetTokenExpiry(user.getResetTokenExpiry())
@@ -70,5 +73,9 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Mot de passe changé"));
     }
 
-
+    @PatchMapping("/me/onboarding")
+    public UserDTO completeOnboarding(Authentication authentication,
+                                      @RequestBody(required = true) PlayerOnboardingRequest request) {
+        return userService.completeOnboarding(authentication, request);
+    }
 }

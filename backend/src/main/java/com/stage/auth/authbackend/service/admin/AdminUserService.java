@@ -111,6 +111,8 @@ public class AdminUserService {
                 .scoreTotal(user.getScoreTotal())
                 .pointsExperience(user.getPointsExperience())
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
+                .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
                 .resetToken(user.getResetToken())
                 .resetTokenExpiry(user.getResetTokenExpiry())

@@ -12,6 +12,7 @@ export const USER_ENDPOINTS = {
   ME: "/users/me",
   UPDATE_PROFILE: "/users/update-profile",
   CHANGE_PASSWORD: "/users/change-password",
+  ONBOARDING: "/users/me/onboarding",
 } as const;
 
 export const ADMIN_ENDPOINTS = {
@@ -22,4 +23,6 @@ export const ADMIN_ENDPOINTS = {
   USER_ROLE: (id: number | string) => `/admin/users/${id}/change-role`,
   GAMES: "/admin/games",
   GAME_BY_ID: (id: number | string) => `/admin/games/${id}`,
+  BADGES: "/admin/badges",
+  BADGE_BY_ID: (id: number | string) => `/admin/badges/${id}`,
 } as const;

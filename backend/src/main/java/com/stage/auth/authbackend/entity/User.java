@@ -61,12 +61,8 @@ public class User {
     @JoinColumn(name = "id_region")
     private Region region;
 
-    @ManyToOne
-    @JoinColumn(name = "id_ville")
-    private Ville ville;
-
-    /** Pour les JOUEUR : true = a complété pays/région/ville */
-    @Column(name = "onboarding_completed")
+    /** Pour les JOUEUR : true = a complété pays/région */
+    @Column(name = "onboarding_completed", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean onboardingCompleted = false;
 

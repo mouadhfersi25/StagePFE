@@ -63,6 +63,9 @@ export interface UserDTO {
   niveau: number | null;
   scoreTotal: number | null;
   pointsExperience: number | null;
+  idRegion: number | null;
+  idPays: number | null;
+  onboardingCompleted: boolean;
   idGenre: number | null;
   resetToken: string | null;
   resetTokenExpiry: string | null;
@@ -85,6 +88,12 @@ export interface UpdateProfileRequest {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
+}
+
+/** PATCH /api/users/me/onboarding - body (joueurs uniquement) */
+export interface PlayerOnboardingRequest {
+  paysNom: string;
+  regionNom: string;
 }
 
 // ----- Admin Games (POST /api/admin/games) -----
@@ -138,3 +147,52 @@ export interface GameDTO {
   icone: string | null;
   dateCreation: string | null;
 }
+
+// ----- Admin Badges (GET/POST/PUT/DELETE /api/admin/badges) -----
+
+/** Types de condition prédéfinis (alignés backend TypeConditionBadge). */
+export type TypeConditionBadge =
+  | 'SCORE_MIN'
+  | 'FIRST_WIN'
+  | 'GAMES_PLAYED'
+  | 'STREAK_DAYS'
+  | 'QUIZ_WIN'
+  | 'PERFECT_GAME';
+
+/** GET /api/admin/badges, GET /api/admin/badges/:id - response. Aligné BadgeDTO backend (table badges). */
+export interface BadgeDTO {
+  id: number;
+  nom: string;
+  description: string | null;
+  typeCondition: string | null;
+  scoreCondition: number | null;
+  icone: string | null;
+}
+
+/** POST /api/admin/badges - body */
+export interface CreateBadgeRequest {
+  nom: string;
+  description?: string;
+  typeCondition: string;
+  scoreCondition?: number;
+  icone?: string;
+}
+
+/** PUT /api/admin/badges/:id - body (champs optionnels) */
+export interface UpdateBadgeRequest {
+  nom?: string;
+  description?: string;
+  typeCondition?: string;
+  scoreCondition?: number;
+  icone?: string;
+}
+
+/** Liste des conditions pour le select admin (value = typeCondition). */
+export const BADGE_CONDITION_OPTIONS: { value: TypeConditionBadge; label: string; needsValue: boolean }[] = [
+  { value: 'SCORE_MIN', label: 'Score total minimum', needsValue: true },
+  { value: 'FIRST_WIN', label: 'Première victoire', needsValue: false },
+  { value: 'GAMES_PLAYED', label: 'Nombre de parties jouées', needsValue: true },
+  { value: 'STREAK_DAYS', label: 'Série de jours (connexion)', needsValue: true },
+  { value: 'QUIZ_WIN', label: 'Gagner une partie Quiz', needsValue: false },
+  { value: 'PERFECT_GAME', label: 'Partie sans erreur', needsValue: false },
+];

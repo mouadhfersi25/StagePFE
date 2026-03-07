@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const [totalPlayers, setTotalPlayers] = useState<number>(0);
   const [totalGames, setTotalGames] = useState<number>(0);
+  const [totalBadges, setTotalBadges] = useState<number>(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
   const email = user?.email ?? '';
@@ -44,6 +45,18 @@ export default function AdminDashboard() {
       });
     return () => { cancelled = true; };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .getBadges()
+      .then((res: { data?: unknown[] }) => {
+        if (!cancelled && Array.isArray(res.data)) setTotalBadges(res.data.length);
+      })
+      .catch(() => {
+        if (!cancelled) setTotalBadges(0);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const stats = [
     {
@@ -72,7 +85,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'Badges définis',
-      value: 0,
+      value: totalBadges,
       icon: <Award className="w-6 h-6" />,
       color: 'from-yellow-500 to-orange-500',
       change: '—',

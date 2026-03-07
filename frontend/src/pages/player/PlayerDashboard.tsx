@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { 
@@ -16,10 +17,47 @@ import {
   Trophy
 } from 'lucide-react';
 import { useAuth } from '@/context';
+import userApi from '@/api/user/user.api';
+import type { UserDTO } from '@/api/types/api.types';
+import PlayerOnboardingModal from '@/components/features/player/PlayerOnboardingModal';
+
+const ONBOARDING_DELAY_MS = 2000;
 
 export default function PlayerDashboard() {
   const navigate = useNavigate();
   const { playerProfile, logout } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    userApi
+      .getMe()
+      .then((res) => {
+        const data = res.data as UserDTO;
+        const isPlayer = (data.role || '').toUpperCase() === 'JOUEUR';
+        const incomplete = isPlayer && !data.onboardingCompleted;
+        setNeedsOnboarding(incomplete);
+      })
+      .catch(() => setNeedsOnboarding(false));
+  }, []);
+
+  useEffect(() => {
+    if (needsOnboarding !== true) return;
+    const t = setTimeout(() => setShowOnboarding(true), ONBOARDING_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [needsOnboarding]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    try {
+      const res = await userApi.getMe();
+      const data = res.data as UserDTO;
+      const isPlayer = (data.role || "").toUpperCase() === "JOUEUR";
+      setNeedsOnboarding(isPlayer && !data.onboardingCompleted);
+    } catch {
+      setNeedsOnboarding(false);
+    }
+  };
 
   if (!playerProfile) return null;
 
@@ -39,6 +77,9 @@ export default function PlayerDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      {showOnboarding && (
+        <PlayerOnboardingModal onComplete={handleOnboardingComplete} />
+      )}
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
