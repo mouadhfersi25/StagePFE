@@ -6,6 +6,7 @@ import { userService } from '@/services/user.service';
 import storage from '@/utils/storage';
 import type { UserDTO } from '@/data/types';
 import type { UpdateProfileRequest } from '@/api/types';
+import { validateRequired, validatePhone, validateMaxLength, type ValidationResult } from '@/utils/formValidation';
 
 const MAX_IMAGE_SIZE_MB = 2;
 const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp,image/gif';
@@ -18,6 +19,7 @@ export default function AdminEditMyProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState<ValidationResult>({});
 
   const [form, setForm] = useState<UpdateProfileRequest>({
     nom: '',
@@ -60,6 +62,7 @@ export default function AdminEditMyProfile() {
     setForm((prev) => ({ ...prev, [name]: value }));
     setError(null);
     setSuccess(false);
+    setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,8 +94,24 @@ export default function AdminEditMyProfile() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const validate = (): boolean => {
+    const next: ValidationResult = {};
+    const nomErr = validateRequired(form.nom, 'Le nom est requis')
+      ?? validateMaxLength(form.nom ?? '', 100, 'Le nom ne doit pas dépasser 100 caractères');
+    if (nomErr) next.nom = nomErr;
+    const prenomErr = validateRequired(form.prenom, 'Le prénom est requis')
+      ?? validateMaxLength(form.prenom ?? '', 100, 'Le prénom ne doit pas dépasser 100 caractères');
+    if (prenomErr) next.prenom = prenomErr;
+    const phoneErr = validateRequired(form.telephone, 'Le téléphone est requis')
+      ?? validatePhone(form.telephone);
+    if (phoneErr) next.telephone = phoneErr;
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     setSaving(true);
     setError(null);
     setSuccess(false);
@@ -146,7 +165,7 @@ export default function AdminEditMyProfile() {
           <p className="text-sm text-gray-500 mt-1">Mettez à jour vos informations personnelles.</p>
         </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
               {error && (
                 <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">
                   {error}
@@ -222,9 +241,15 @@ export default function AdminEditMyProfile() {
                       name="prenom"
                       value={form.prenom}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                      onBlur={() => {
+                        const msg = validateRequired(form.prenom, 'Le prénom est requis')
+                          ?? validateMaxLength(form.prenom ?? '', 100, 'Maximum 100 caractères');
+                        setErrors((p) => (msg ? { ...p, prenom: msg } : { ...p, prenom: '' }));
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.prenom ? 'border-red-500' : 'border-gray-200'}`}
                       placeholder="Prénom"
                     />
+                    {errors.prenom && <p className="mt-1 text-sm text-red-600">{errors.prenom}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom</label>
@@ -233,22 +258,33 @@ export default function AdminEditMyProfile() {
                       name="nom"
                       value={form.nom}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                      onBlur={() => {
+                        const msg = validateRequired(form.nom, 'Le nom est requis')
+                          ?? validateMaxLength(form.nom ?? '', 100, 'Maximum 100 caractères');
+                        setErrors((p) => (msg ? { ...p, nom: msg } : { ...p, nom: '' }));
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.nom ? 'border-red-500' : 'border-gray-200'}`}
                       placeholder="Nom"
                     />
+                    {errors.nom && <p className="mt-1 text-sm text-red-600">{errors.nom}</p>}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone *</label>
                   <input
                     type="text"
                     name="telephone"
                     value={form.telephone}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                    onBlur={() => {
+                      const msg = validateRequired(form.telephone, 'Le téléphone est requis') ?? validatePhone(form.telephone);
+                      setErrors((p) => (msg ? { ...p, telephone: msg } : { ...p, telephone: '' }));
+                    }}
+                    className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.telephone ? 'border-red-500' : 'border-gray-200'}`}
                     placeholder="8 chiffres"
                   />
+                  {errors.telephone && <p className="mt-1 text-sm text-red-600">{errors.telephone}</p>}
                 </div>
               </div>
 

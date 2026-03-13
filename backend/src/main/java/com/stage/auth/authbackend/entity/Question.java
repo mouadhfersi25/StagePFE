@@ -21,6 +21,9 @@ public class Question {
 
     @Column(name = "bonne_reponse", columnDefinition = "TEXT")
     private String bonneReponse;
+    
+    @Column(name = "options", columnDefinition = "TEXT")
+    private String options;
 
     @Column(columnDefinition = "TEXT")
     private String explication;

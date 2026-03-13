@@ -45,6 +45,8 @@ public class SecurityConfig {
                         // ✅ bonne pratique Spring : ADMIN -> ROLE_ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
+                        // Éducateur : gestion du contenu (questions, jeux, etc.)
+                        .requestMatchers("/api/educator/**").hasRole("EDUCATEUR")
 
                         // ➤ Utilisateurs authentifiés
                         .requestMatchers("/api/users/**").authenticated()

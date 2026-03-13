@@ -1,12 +1,113 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Gamepad2, HelpCircle, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
-import { useAdminData } from '@/context';
+import educatorApi from '@/api/educator/educator.api';
+import type { GameDTO } from '@/api/types/api.types';
+
+type DisplayGame = {
+  id: number;
+  type: 'quiz' | 'memory';
+  title: string;
+  description: string;
+  difficulty: string;
+  ageRange: string;
+  icon: string;
+};
+
+function mapGameDTO(dto: GameDTO): DisplayGame | null {
+  const type = dto.typeJeu === 'QUIZ' ? 'quiz' : dto.typeJeu === 'MEMOIRE' ? 'memory' : null;
+  if (!type) return null;
+  const difficulty =
+    dto.difficulte === 1 ? 'Easy' : dto.difficulte === 2 ? 'Medium' : dto.difficulte === 3 ? 'Hard' : 'Medium';
+  const ageRange =
+    dto.ageMin != null && dto.ageMax != null ? `${dto.ageMin}-${dto.ageMax}` : dto.ageMin != null ? `${dto.ageMin}+` : '—';
+  return {
+    id: dto.id,
+    type,
+    title: dto.titre,
+    description: dto.description ?? '',
+    difficulty,
+    ageRange,
+    icon: dto.icone ?? '🎮',
+  };
+}
 
 export default function EducatorGames() {
   const navigate = useNavigate();
-  const { games, educatorQuestions, gameConfigs } = useAdminData();
+  const [games, setGames] = useState<DisplayGame[]>([]);
+  const [questionCounts, setQuestionCounts] = useState<Record<number, number>>({});
+  const [pairCounts, setPairCounts] = useState<Record<number, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    educatorApi
+      .getGames()
+      .then((res) => {
+        if (cancelled) return;
+        const list = (res.data ?? [])
+          .map(mapGameDTO)
+          .filter((g): g is DisplayGame => g !== null);
+        setGames(list);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err?.response?.data?.message ?? err?.message ?? 'Impossible de charger les jeux.');
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const quizGames = games.filter((g) => g.type === 'quiz');
+    if (quizGames.length === 0) return;
+    let cancelled = false;
+    const counts: Record<number, number> = {};
+    Promise.all(
+      quizGames.map((g) =>
+        educatorApi.getQuestions(g.id).then((r) => {
+          if (!cancelled) counts[g.id] = (r.data ?? []).length;
+        })
+      )
+    ).then(() => {
+      if (!cancelled) setQuestionCounts((prev) => ({ ...prev, ...counts }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [games]);
+
+  useEffect(() => {
+    const memoryGamesList = games.filter((g) => g.type === 'memory');
+    if (memoryGamesList.length === 0) return;
+    let cancelled = false;
+    const counts: Record<number, number> = {};
+    Promise.all(
+      memoryGamesList.map((g) =>
+        educatorApi.getMemoryCards(g.id).then((r) => {
+          if (cancelled) return;
+          const cards = r.data ?? [];
+          const keys = new Set(cards.map((c) => c.pairKey).filter(Boolean));
+          counts[g.id] = keys.size;
+        })
+      )
+    ).then(() => {
+      if (!cancelled) setPairCounts((prev) => ({ ...prev, ...counts }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [games]);
+
   const quizGames = games.filter((g) => g.type === 'quiz');
   const memoryGames = games.filter((g) => g.type === 'memory');
   const hasAny = quizGames.length > 0 || memoryGames.length > 0;
@@ -22,7 +123,15 @@ export default function EducatorGames() {
             <p className="text-gray-600">Games created by the admin. Configure Quiz (questions) or Memory (pairs) content here.</p>
           </div>
 
-          {!hasAny ? (
+          {loading ? (
+            <div className="bg-white rounded-xl p-8 border border-gray-100 text-center text-gray-600">
+              <p>Chargement des jeux…</p>
+            </div>
+          ) : error ? (
+            <div className="bg-white rounded-xl p-8 border border-red-100 text-center text-red-600">
+              <p>{error}</p>
+            </div>
+          ) : !hasAny ? (
             <div className="bg-white rounded-xl p-8 border border-gray-100 text-center text-gray-600">
               <p>No quiz or memory games yet. The admin must add a game first.</p>
             </div>
@@ -33,7 +142,7 @@ export default function EducatorGames() {
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Quiz games</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {quizGames.map((game, index) => {
-                      const questionCount = educatorQuestions.filter((q) => q.gameId === game.id).length;
+                      const questionCount = questionCounts[game.id] ?? 0;
                       return (
                         <motion.div
                           key={game.id}
@@ -92,8 +201,7 @@ export default function EducatorGames() {
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Memory games</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {memoryGames.map((game, index) => {
-                      const cfg = gameConfigs[game.id];
-                      const pairCount = cfg?.type === 'memory' ? cfg.pairs.length : 0;
+                      const pairCount = pairCounts[game.id] ?? 0;
                       return (
                         <motion.div
                           key={game.id}

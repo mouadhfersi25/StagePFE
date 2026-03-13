@@ -6,7 +6,7 @@ import com.stage.auth.authbackend.entity.EtatCompte;
 import com.stage.auth.authbackend.entity.Role;
 import com.stage.auth.authbackend.entity.User;
 import com.stage.auth.authbackend.exception.ApiException;
-import com.stage.auth.authbackend.repository.UserRepository;
+import com.stage.auth.authbackend.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

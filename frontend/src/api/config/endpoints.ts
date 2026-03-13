@@ -26,3 +26,13 @@ export const ADMIN_ENDPOINTS = {
   BADGES: "/admin/badges",
   BADGE_BY_ID: (id: number | string) => `/admin/badges/${id}`,
 } as const;
+
+export const EDUCATOR_ENDPOINTS = {
+  GAMES: "/educator/games",
+  GAME_BY_ID: (id: number | string) => `/educator/games/${id}`,
+  QUESTIONS: "/educator/questions",
+  QUESTION_BY_ID: (id: number | string) => `/educator/questions/${id}`,
+  MEMORY_CARDS: "/educator/memory-cards",
+  MEMORY_CARD_BY_ID: (id: number | string) => `/educator/memory-cards/${id}`,
+  DASHBOARD_STATS: "/educator/dashboard/stats",
+} as const;

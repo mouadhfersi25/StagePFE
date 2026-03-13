@@ -196,3 +196,73 @@ export const BADGE_CONDITION_OPTIONS: { value: TypeConditionBadge; label: string
   { value: 'QUIZ_WIN', label: 'Gagner une partie Quiz', needsValue: false },
   { value: 'PERFECT_GAME', label: 'Partie sans erreur', needsValue: false },
 ];
+
+// ----- Educator (GET/POST/PUT/DELETE /api/educator/*) - synchronisés backend (controller/DTO/entity/service) -----
+
+/** GET /api/educator/questions?gameId= - response. QuizQuestionDTO backend (table questions). */
+export interface QuizQuestionDTO {
+  id: number;
+  jeuId: number;
+  jeuTitre: string;
+  contenu: string;
+  bonneReponse: string;
+  options: string[] | null;
+  explication: string | null;
+  difficulte: number | null;
+}
+
+/** POST /api/educator/questions - body. Aligné CreateQuizQuestionRequest backend. */
+export interface CreateQuizQuestionRequest {
+  jeuId: number;
+  contenu: string;
+  bonneReponse: string;
+  options?: string[];
+  explication?: string;
+  difficulte?: number;
+}
+
+/** PUT /api/educator/questions/:id - body. Aligné UpdateQuizQuestionRequest backend. */
+export interface UpdateQuizQuestionRequest {
+  contenu?: string;
+  bonneReponse?: string;
+  options?: string[];
+  explication?: string;
+  difficulte?: number;
+}
+
+// ----- Educator Memory (GET/POST/PUT/DELETE /api/educator/memory-cards) -----
+
+/** GET /api/educator/memory-cards?gameId= - response. */
+export interface MemoryCardDTO {
+  id: number;
+  jeuId: number;
+  jeuTitre: string;
+  symbole: string;
+  pairKey: string | null;
+  categorie: string | null;
+}
+
+/** POST /api/educator/memory-cards - body. */
+export interface CreateMemoryCardRequest {
+  jeuId: number;
+  symbole: string;
+  pairKey?: string | null;
+  categorie?: string | null;
+}
+
+/** PUT /api/educator/memory-cards/:id - body. */
+export interface UpdateMemoryCardRequest {
+  symbole?: string;
+  pairKey?: string | null;
+  categorie?: string | null;
+}
+
+// ----- Educator Dashboard (GET /api/educator/dashboard/stats) - EducatorDashboardStatsDTO backend -----
+
+export interface EducatorDashboardStatsDTO {
+  totalQuestionsCreated: number;
+  assignedGames: number;
+  avgSuccessRate: number;
+  studentActivity: number;
+  difficultyDistribution: { name: string; value: number; color: string }[];
+}

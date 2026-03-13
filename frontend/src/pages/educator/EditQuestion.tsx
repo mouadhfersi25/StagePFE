@@ -1,72 +1,147 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
-import { useAdminData } from '@/context';
+import educatorApi from '@/api/educator/educator.api';
+import type { QuizQuestionDTO, GameDTO, UpdateQuizQuestionRequest } from '@/api/types/api.types';
+
+const OPTIONS_COUNT = 4;
+const DIFFICULTE_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: 'Facile' },
+  { value: 2, label: 'Moyen' },
+  { value: 3, label: 'Difficile' },
+];
 
 export default function EditQuestion() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { games, educatorQuestions, setEducatorQuestions } = useAdminData();
-  const question = educatorQuestions.find((q) => q.id === id);
-  const quizGames = games.filter((g) => g.type === 'quiz');
+  const questionId = id ? Number(id) : null;
 
-  const [formData, setFormData] = useState({
-    content: '',
-    gameId: '',
-    difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+  const [question, setQuestion] = useState<QuizQuestionDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<{
+    contenu: string;
+    options: string[];
+    correctAnswerIndex: number;
+    explication: string;
+    difficulte: number | '';
+  }>({
+    contenu: '',
     options: ['', '', '', ''],
-    correctAnswer: 0,
+    correctAnswerIndex: 0,
+    explication: '',
+    difficulte: '',
   });
 
   useEffect(() => {
-    if (!question) return;
-    setFormData({
-      content: question.content,
-      gameId: question.gameId,
-      difficulty: question.difficulty,
-      options: question.options ?? ['', '', '', ''],
-      correctAnswer: question.correctAnswer,
+    if (questionId == null || Number.isNaN(questionId)) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    educatorApi
+      .getQuestionById(questionId)
+      .then((res) => {
+        if (cancelled) return;
+        const q = res.data as QuizQuestionDTO;
+        setQuestion(q);
+        const raw = q.options && q.options.length > 0 ? [...q.options] : [];
+        const opts: string[] = [];
+        for (let i = 0; i < OPTIONS_COUNT; i++) opts.push(raw[i] ?? '');
+        const correctIndex = q.bonneReponse
+          ? Math.max(0, opts.findIndex((o) => o === q.bonneReponse))
+          : 0;
+        setFormData({
+          contenu: q.contenu ?? '',
+          options: opts,
+          correctAnswerIndex: correctIndex < 0 ? 0 : correctIndex,
+          explication: q.explication ?? '',
+          difficulte: q.difficulte ?? '',
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error('Question introuvable.');
+          setQuestion(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [questionId]);
+
+  const setOptionText = (index: number, value: string) => {
+    setFormData((prev) => {
+      const next = [...prev.options];
+      next[index] = value;
+      return { ...prev, options: next };
     });
-  }, [id, question?.content, question?.gameId, question?.difficulty, question?.correctAnswer]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id) return;
-    setEducatorQuestions((prev) =>
-      prev.map((q) =>
-        q.id === id
-          ? {
-              ...q,
-              content: formData.content,
-              gameId: formData.gameId,
-              gameName: quizGames.find((g) => g.id === formData.gameId)?.title ?? q.gameName,
-              difficulty: formData.difficulty,
-              options: formData.options,
-              correctAnswer: formData.correctAnswer,
-            }
-          : q
-      )
-    );
-    toast.success('Question updated successfully!');
-    navigate('/educator/questions');
+    if (questionId == null || !question) return;
+    const optionsFiltered = formData.options.map((o) => o.trim()).filter(Boolean);
+    if (optionsFiltered.length !== OPTIONS_COUNT) {
+      toast.error(`Veuillez remplir les ${OPTIONS_COUNT} options.`);
+      return;
+    }
+    const bonneReponse = optionsFiltered[formData.correctAnswerIndex];
+    if (!bonneReponse) {
+      toast.error('Sélectionnez la bonne réponse.');
+      return;
+    }
+    const payload: UpdateQuizQuestionRequest = {
+      contenu: formData.contenu.trim(),
+      bonneReponse,
+      options: optionsFiltered,
+    };
+    if (formData.explication.trim()) payload.explication = formData.explication.trim();
+    if (formData.difficulte !== '') payload.difficulte = formData.difficulte as number;
+
+    setSubmitting(true);
+    educatorApi
+      .updateQuestion(questionId, payload)
+      .then(() => {
+        toast.success('Question mise à jour.');
+        navigate('/educator/questions');
+      })
+      .catch((err) => {
+        toast.error(err.response?.data?.message || err.message || 'Erreur lors de la mise à jour.');
+      })
+      .finally(() => setSubmitting(false));
   };
 
-  const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...formData.options];
-    newOptions[index] = value;
-    setFormData({ ...formData, options: newOptions });
-  };
+  const inputClass =
+    'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500';
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <EducatorSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   if (!question) {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-600">Question not found.</p>
-          <button onClick={() => navigate('/educator/questions')} className="ml-4 text-green-600 hover:underline">Back to Questions</button>
+        <div className="flex-1 flex items-center justify-center gap-4">
+          <p className="text-gray-600">Question introuvable.</p>
+          <button
+            onClick={() => navigate('/educator/questions')}
+            className="text-green-600 hover:underline font-medium"
+          >
+            Retour aux questions
+          </button>
         </div>
       </div>
     );
@@ -75,7 +150,7 @@ export default function EditQuestion() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
-      
+
       <div className="flex-1 overflow-auto">
         <div className="p-8">
           <div className="mb-6">
@@ -84,9 +159,12 @@ export default function EditQuestion() {
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Questions
+              Retour aux questions
             </button>
-            <h1 className="text-3xl font-bold text-gray-900">Edit Question</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Modifier la question</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Jeu : {question.jeuTitre}
+            </p>
           </div>
 
           <motion.div
@@ -97,54 +175,20 @@ export default function EditQuestion() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Question Text *
+                  Contenu (énoncé) <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[100px]"
-                  placeholder="Enter your question here..."
+                  value={formData.contenu}
+                  onChange={(e) => setFormData({ ...formData, contenu: e.target.value })}
+                  className={`${inputClass} min-h-[100px]`}
+                  placeholder="Énoncé de la question..."
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Game *
-                  </label>
-                  <select
-                    value={formData.gameId}
-                    onChange={(e) => setFormData({ ...formData, gameId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
-                  >
-                    <option value="">Choose a game...</option>
-                    {quizGames.map((game) => (
-                      <option key={game.id} value={game.id}>{game.title}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty *
-                  </label>
-                  <select
-                    value={formData.difficulty}
-                    onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Answer Options *
+                  Options de réponse (4 obligatoires) <span className="text-red-500">*</span>
                 </label>
                 <div className="space-y-3">
                   {formData.options.map((option, index) => (
@@ -152,25 +196,59 @@ export default function EditQuestion() {
                       <input
                         type="radio"
                         name="correctAnswer"
-                        checked={formData.correctAnswer === index}
-                        onChange={() => setFormData({ ...formData, correctAnswer: index })}
-                        className="w-4 h-4 text-green-600"
+                        checked={formData.correctAnswerIndex === index}
+                        onChange={() => setFormData({ ...formData, correctAnswerIndex: index })}
+                        className="w-4 h-4 text-green-600 shrink-0"
                       />
                       <input
                         type="text"
                         value={option}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        onChange={(e) => setOptionText(index, e.target.value)}
+                        className={`${inputClass} flex-1`}
                         placeholder={`Option ${index + 1}`}
                         required
                       />
-                      {formData.correctAnswer === index && (
-                        <span className="text-xs text-green-600 font-medium">Correct Answer</span>
-                      )}
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Select the correct answer by clicking the radio button</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Sélectionnez la bonne réponse en cliquant sur le bouton radio.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Explication (optionnel)
+                </label>
+                <textarea
+                  value={formData.explication}
+                  onChange={(e) => setFormData({ ...formData, explication: e.target.value })}
+                  className={`${inputClass} min-h-[80px]`}
+                  placeholder="Explication affichée après la réponse..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Difficulté (optionnel)
+                </label>
+                <select
+                  value={formData.difficulte === '' ? '' : formData.difficulte}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      difficulte: e.target.value === '' ? '' : Number(e.target.value),
+                    })
+                  }
+                  className={inputClass}
+                >
+                  <option value="">—</option>
+                  {DIFFICULTE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -178,19 +256,21 @@ export default function EditQuestion() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium disabled:opacity-60"
                 >
-                  <Save className="w-4 h-4" />
-                  Update Question
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Enregistrer les modifications
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="button"
                   onClick={() => navigate('/educator/questions')}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  disabled={submitting}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-60"
                 >
-                  Cancel
+                  Annuler
                 </motion.button>
               </div>
             </form>

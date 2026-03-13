@@ -6,7 +6,7 @@ import com.stage.auth.authbackend.dto.user.UpdateProfileRequest;
 import com.stage.auth.authbackend.dto.user.UserDTO;
 import com.stage.auth.authbackend.entity.User;
 import com.stage.auth.authbackend.exception.ApiException;
-import com.stage.auth.authbackend.repository.UserRepository;
+import com.stage.auth.authbackend.repository.user.UserRepository;
 import com.stage.auth.authbackend.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

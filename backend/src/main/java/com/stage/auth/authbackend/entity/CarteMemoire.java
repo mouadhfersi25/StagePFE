@@ -16,14 +16,29 @@ public class CarteMemoire {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(columnDefinition = "TEXT")
-    private String contenu;
-
-    @Column(length = 255)
-    private String paire;
-
+    /**
+     * Jeu de type MEMOIRE auquel cette carte appartient.
+     */
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_jeu", nullable = false)
     private Jeu jeu;
+
+    /**
+     * Symbole affiché sur la carte (emoji, texte, etc.). Aligné frontend / DTO.
+     */
+    @Column(nullable = false, length = 100)
+    private String symbole;
+
+    /**
+     * Identifiant de paire pour regrouper deux cartes qui vont ensemble.
+     */
+    @Column(name = "pair_key", length = 50)
+    private String pairKey;
+
+    /**
+     * Catégorie ou thème de la carte (optionnel).
+     */
+    @Column(length = 100)
+    private String categorie;
 }
 

@@ -1,30 +1,90 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Plus, Edit, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
-import { useAdminData } from '@/context';
+import educatorApi from '@/api/educator/educator.api';
+import type { GameDTO, QuizQuestionDTO } from '@/api/types/api.types';
+
+function difficultyLabel(d: number | null): string {
+  return d === 1 ? 'Easy' : d === 2 ? 'Medium' : d === 3 ? 'Hard' : 'Medium';
+}
 
 export default function GameQuestions() {
   const { gameId } = useParams();
   const navigate = useNavigate();
-  const { games, educatorQuestions, setEducatorQuestions } = useAdminData();
-  const game = games.find((g) => g.id === gameId);
-  const questionsForGame = educatorQuestions.filter((q) => q.gameId === gameId);
+  const id = gameId != null ? Number(gameId) : NaN;
+  const [game, setGame] = useState<GameDTO | null>(null);
+  const [questionsForGame, setQuestionsForGame] = useState<QuizQuestionDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleDelete = (questionId: string) => {
-    if (confirm('Are you sure you want to delete this question?')) {
-      setEducatorQuestions((prev) => prev.filter((q) => q.id !== questionId));
-      toast.success('Question deleted');
+  useEffect(() => {
+    if (!Number.isFinite(id)) {
+      setLoading(false);
+      setError('Invalid game id');
+      return;
     }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      educatorApi.getGameById(id),
+      educatorApi.getQuestions(id),
+    ])
+      .then(([gameRes, questionsRes]) => {
+        if (cancelled) return;
+        const g = gameRes.data;
+        if (!g || g.typeJeu !== 'QUIZ') {
+          setError('Game not found or not a quiz game.');
+          setGame(null);
+          setQuestionsForGame([]);
+        } else {
+          setGame(g);
+          setQuestionsForGame(Array.isArray(questionsRes.data) ? questionsRes.data : []);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err?.response?.data?.message ?? err?.message ?? 'Failed to load game or questions.');
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const handleDelete = (questionId: number) => {
+    if (!confirm('Are you sure you want to delete this question?')) return;
+    educatorApi
+      .deleteQuestion(questionId)
+      .then(() => {
+        setQuestionsForGame((prev) => prev.filter((q) => q.id !== questionId));
+        toast.success('Question deleted');
+      })
+      .catch((err) => {
+        toast.error(err?.response?.data?.message ?? 'Failed to delete question.');
+      });
   };
 
-  if (!game || game.type !== 'quiz') {
+  if (loading) {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-600">Game not found.</p>
+          <p className="text-gray-600">Chargement…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !game) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <EducatorSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-gray-600">{error ?? 'Game not found.'}</p>
           <button onClick={() => navigate('/educator/games')} className="ml-4 text-green-600 hover:underline">Back to Games</button>
         </div>
       </div>
@@ -47,7 +107,7 @@ export default function GameQuestions() {
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Manage questions</h1>
             <p className="text-gray-600 mt-1">
-              <span className="font-medium text-gray-800">{game.title}</span> — add, edit or delete questions for this quiz.
+              <span className="font-medium text-gray-800">{game.titre}</span> — add, edit or delete questions for this quiz.
             </p>
           </div>
 
@@ -95,27 +155,27 @@ export default function GameQuestions() {
                     <tr>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Question</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Difficulty</th>
-                      <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Created</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {questionsForGame.map((question) => (
+                    {questionsForGame.map((question) => {
+                      const diff = difficultyLabel(question.difficulte);
+                      return (
                       <tr key={question.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="py-4 px-6">
-                          <p className="font-medium text-gray-900">{question.content}</p>
+                          <p className="font-medium text-gray-900">{question.contenu}</p>
                           <p className="text-xs text-gray-500 mt-1">{question.options?.length ?? 0} options</p>
                         </td>
                         <td className="py-4 px-6">
                           <span
                             className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              question.difficulty === 'Easy' ? 'bg-green-100 text-green-800' : question.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                              diff === 'Easy' ? 'bg-green-100 text-green-800' : diff === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                             }`}
                           >
-                            {question.difficulty}
+                            {diff}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-sm text-gray-500">{question.createdDate}</td>
                         <td className="py-4 px-6">
                           <div className="flex gap-2">
                             <motion.button
@@ -139,7 +199,7 @@ export default function GameQuestions() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );})}
                   </tbody>
                 </table>
               </div>

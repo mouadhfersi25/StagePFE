@@ -5,7 +5,7 @@ import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
 import com.stage.auth.authbackend.entity.Jeu;
 import com.stage.auth.authbackend.exception.ApiException;
-import com.stage.auth.authbackend.repository.JeuRepository;
+import com.stage.auth.authbackend.repository.game.JeuRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

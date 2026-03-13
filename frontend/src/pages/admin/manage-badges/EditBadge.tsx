@@ -6,6 +6,13 @@ import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import type { BadgeDTO, UpdateBadgeRequest, TypeConditionBadge } from '@/api/types/api.types';
 import { BADGE_CONDITION_OPTIONS } from '@/api/types/api.types';
+import {
+  validateRequired,
+  validateMaxLength,
+  validateNonNegativeNumber,
+  runValidations,
+  type ValidationResult,
+} from '@/utils/formValidation';
 
 const badgeIcons = ['🏆', '🎮', '🎯', '🔥', '⚡', '📚', '🧠', '🧩', '💯', '⭐', '🌟', '🎖️'];
 
@@ -19,6 +26,7 @@ export default function EditBadge() {
   const [badge, setBadge] = useState<BadgeDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<ValidationResult>({});
   const [formData, setFormData] = useState({
     nom: '',
     description: '',
@@ -55,9 +63,27 @@ export default function EditBadge() {
     return () => { cancelled = true; };
   }, [id]);
 
+  const validate = (): boolean => {
+    const rules = [
+      { field: 'nom', message: validateRequired(formData.nom, 'Nom du badge requis') ?? validateMaxLength(formData.nom, 150, 'Maximum 150 caractères') },
+      { field: 'description', message: validateRequired(formData.description, 'La description est requise') ?? validateMaxLength(formData.description ?? '', 255, 'Maximum 255 caractères') },
+      { field: 'typeCondition', message: validateRequired(formData.typeCondition, 'Condition de déblocage requise') },
+      { field: 'icone', message: validateRequired(formData.icone, 'Choisissez une icône') },
+    ];
+    if (needsValue) {
+      const scoreEmpty = formData.scoreCondition === '' || formData.scoreCondition === undefined;
+      const scoreErr = scoreEmpty ? 'La valeur est requise' : validateNonNegativeNumber(formData.scoreCondition, 'La valeur doit être ≥ 0');
+      if (scoreErr) rules.push({ field: 'scoreCondition', message: scoreErr });
+    }
+    const next = runValidations(rules);
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !badge) return;
+    if (!validate()) return;
     const payload: UpdateBadgeRequest = {
       nom: formData.nom.trim(),
       description: formData.description.trim() || undefined,
@@ -142,7 +168,7 @@ export default function EditBadge() {
           className="bg-white rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden"
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-rose-500 to-pink-500" />
-          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
+          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5" noValidate>
             {/* Nom */}
             <div>
               <label htmlFor="edit-nom" className={labelClass}>
@@ -152,27 +178,34 @@ export default function EditBadge() {
                 id="edit-nom"
                 type="text"
                 value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                className={inputClass}
+                onChange={(e) => { setFormData({ ...formData, nom: e.target.value }); setErrors((p) => ({ ...p, nom: '' })); }}
+                onBlur={() => {
+                  const msg = validateRequired(formData.nom, 'Nom du badge requis') ?? validateMaxLength(formData.nom, 150, 'Maximum 150 caractères');
+                  setErrors((p) => (msg ? { ...p, nom: msg } : { ...p, nom: '' }));
+                }}
+                className={`${inputClass} ${errors.nom ? 'border-red-500' : ''}`}
                 placeholder="ex. Maître du Quiz"
-                required
-                maxLength={150}
               />
+              {errors.nom && <p className="mt-1 text-sm text-red-600">{errors.nom}</p>}
             </div>
 
             {/* Description */}
             <div>
               <label htmlFor="edit-desc" className={labelClass}>
-                Description
+                Description <span className="text-rose-500">*</span>
               </label>
               <textarea
                 id="edit-desc"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className={`${inputClass} min-h-[100px] resize-y`}
+                onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
+                onBlur={() => {
+                  const msg = validateRequired(formData.description, 'La description est requise') ?? validateMaxLength(formData.description ?? '', 255, 'Maximum 255 caractères');
+                  setErrors((p) => (msg ? { ...p, description: msg } : { ...p, description: '' }));
+                }}
+                className={`${inputClass} min-h-[100px] resize-y ${errors.description ? 'border-red-500' : ''}`}
                 placeholder="Décrivez le badge..."
-                maxLength={255}
               />
+              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
 
             {/* Condition */}
@@ -188,11 +221,11 @@ export default function EditBadge() {
                 <select
                   id="edit-condition"
                   value={formData.typeCondition}
-                  onChange={(e) =>
-                    setFormData({ ...formData, typeCondition: e.target.value as TypeConditionBadge, scoreCondition: '' })
-                  }
-                  className={inputClass}
-                  required
+                  onChange={(e) => {
+                    setFormData({ ...formData, typeCondition: e.target.value as TypeConditionBadge, scoreCondition: '' });
+                    setErrors((p) => ({ ...p, typeCondition: '' }));
+                  }}
+                  className={`${inputClass} ${errors.typeCondition ? 'border-red-500' : ''}`}
                 >
                   {BADGE_CONDITION_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -200,6 +233,7 @@ export default function EditBadge() {
                     </option>
                   ))}
                 </select>
+                {errors.typeCondition && <p className="mt-1 text-sm text-red-600">{errors.typeCondition}</p>}
               </div>
               {needsValue && (
                 <div>
@@ -214,14 +248,20 @@ export default function EditBadge() {
                   <input
                     id="edit-value"
                     type="number"
-                    min={0}
                     value={formData.scoreCondition}
-                    onChange={(e) =>
-                      setFormData({ ...formData, scoreCondition: e.target.value === '' ? '' : e.target.value })
-                    }
-                    className={inputClass}
+                    onChange={(e) => {
+                      setFormData({ ...formData, scoreCondition: e.target.value === '' ? '' : e.target.value });
+                      setErrors((p) => ({ ...p, scoreCondition: '' }));
+                    }}
+                    onBlur={() => {
+                      const empty = formData.scoreCondition === '' || formData.scoreCondition === undefined;
+                      const msg = empty ? 'La valeur est requise' : validateNonNegativeNumber(formData.scoreCondition, 'La valeur doit être ≥ 0');
+                      setErrors((p) => (msg ? { ...p, scoreCondition: msg } : { ...p, scoreCondition: '' }));
+                    }}
+                    className={`${inputClass} ${errors.scoreCondition ? 'border-red-500' : ''}`}
                     placeholder={formData.typeCondition === 'SCORE_MIN' ? 'ex. 100' : 'ex. 5'}
                   />
+                  {errors.scoreCondition && <p className="mt-1 text-sm text-red-600">{errors.scoreCondition}</p>}
                 </div>
               )}
             </div>
@@ -238,7 +278,7 @@ export default function EditBadge() {
                     type="button"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setFormData({ ...formData, icone: icon })}
+                    onClick={() => { setFormData({ ...formData, icone: icon }); setErrors((p) => ({ ...p, icone: '' })); }}
                     className={`w-14 h-14 flex items-center justify-center text-2xl rounded-xl border-2 transition-all ${
                       formData.icone === icon
                         ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-rose-50 shadow-md ring-2 ring-orange-500/30'
@@ -249,6 +289,7 @@ export default function EditBadge() {
                   </motion.button>
                 ))}
               </div>
+              {errors.icone && <p className="mt-2 text-sm text-red-600">{errors.icone}</p>}
             </div>
 
             {/* Actions */}

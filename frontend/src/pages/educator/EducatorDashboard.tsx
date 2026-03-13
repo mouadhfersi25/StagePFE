@@ -1,47 +1,76 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { HelpCircle, Gamepad2, Target, Users, TrendingUp, Clock } from 'lucide-react';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
-const educatorStats = { totalQuestionsCreated: 0, assignedGames: 0, avgSuccessRate: 0, studentActivity: 0 };
-const questionPerformance: { question: string; correct: number; incorrect: number; difficulty: string }[] = [];
+import educatorApi from '@/api/educator/educator.api';
+import type { EducatorDashboardStatsDTO } from '@/api/types/api.types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function EducatorDashboard() {
+  const [statsApi, setStatsApi] = useState<EducatorDashboardStatsDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    educatorApi
+      .getDashboardStats()
+      .then((res) => {
+        if (!cancelled) setStatsApi(res.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setStatsApi(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const educatorStats = statsApi ?? {
+    totalQuestionsCreated: 0,
+    assignedGames: 0,
+    avgSuccessRate: 0,
+    studentActivity: 0,
+    difficultyDistribution: [
+      { name: 'Easy', value: 0, color: '#10b981' },
+      { name: 'Medium', value: 0, color: '#f59e0b' },
+      { name: 'Hard', value: 0, color: '#ef4444' },
+    ],
+  };
+
   const stats = [
     {
-      label: 'Questions Created',
+      label: 'Questions créées',
       value: educatorStats.totalQuestionsCreated,
       icon: <HelpCircle className="w-6 h-6" />,
       color: 'from-green-500 to-teal-500',
-      change: '+12 this month',
     },
     {
-      label: 'Assigned Games',
+      label: 'Jeux configurés',
       value: educatorStats.assignedGames,
       icon: <Gamepad2 className="w-6 h-6" />,
       color: 'from-blue-500 to-cyan-500',
-      change: '5 active',
     },
     {
-      label: 'Avg Success Rate',
+      label: 'Taux de réussite moyen',
       value: `${educatorStats.avgSuccessRate}%`,
       icon: <Target className="w-6 h-6" />,
       color: 'from-purple-500 to-pink-500',
-      change: '+3%',
     },
     {
-      label: 'Student Activity',
+      label: 'Activité élèves',
       value: educatorStats.studentActivity,
       icon: <Users className="w-6 h-6" />,
       color: 'from-yellow-500 to-orange-500',
-      change: 'This week',
     },
   ];
 
-  const difficultyData = [
-    { name: 'Easy', value: 35, color: '#10b981' },
-    { name: 'Medium', value: 42, color: '#f59e0b' },
-    { name: 'Hard', value: 23, color: '#ef4444' },
-  ];
+  const questionPerformance: { question: string; correct: number; incorrect: number; difficulty: string }[] = [];
+  const difficultyData = educatorStats.difficultyDistribution.map((d) => ({
+    name: d.name,
+    value: d.value,
+    color: d.color,
+  }));
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -55,7 +84,10 @@ export default function EducatorDashboard() {
             <p className="text-gray-600">Create and manage educational content</p>
           </div>
 
-          {/* Stats Grid */}
+          {/* Stats Grid - synchronisé BDD */}
+          {loading && (
+            <p className="text-sm text-gray-500 mb-4">Chargement des statistiques…</p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
               <motion.div
@@ -72,23 +104,23 @@ export default function EducatorDashboard() {
                   <TrendingUp className="w-5 h-5 text-green-600" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</h3>
-                <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                <p className="text-xs text-green-600 font-medium">{stat.change}</p>
+                <p className="text-sm text-gray-600">{stat.label}</p>
               </motion.div>
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Question Performance */}
+            {/* Question Performance — données à partir de résultats / statistiques BDD */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Question Performance</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-gray-900">Performance par question</h2>
                 <Clock className="w-5 h-5 text-gray-400" />
               </div>
+              <p className="text-xs text-gray-500 mb-6">Données à venir (ex. statistiques_performance, réponses)</p>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={questionPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -101,13 +133,14 @@ export default function EducatorDashboard() {
               </ResponsiveContainer>
             </motion.div>
 
-            {/* Difficulty Distribution */}
+            {/* Difficulty Distribution — BDD: questions.difficulte (1=Easy, 2=Medium, 3=Hard) */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
             >
-              <h2 className="text-lg font-bold text-gray-900 mb-6">Question Difficulty Distribution</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Répartition par difficulté</h2>
+              <p className="text-xs text-gray-500 mb-6">Colonne questions.difficulte (1=Easy, 2=Medium, 3=Hard)</p>
               <div className="flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>

@@ -127,7 +127,7 @@ export default function EditPlayer() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {error && (
               <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">
                 {error}
