@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Edit, Trash2, Loader2, Gamepad2 } from 'lucide-react';
+import { Loader2, Gamepad2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
@@ -11,6 +11,12 @@ const TYPE_ICONS: Record<string, string> = {
   MEMOIRE: '🧠',
   REFLEXE: '⚡',
   LOGIQUE: '🎯',
+};
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  EN_ATTENTE: { label: 'En attente', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  ACCEPTE: { label: 'Accepté', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  REFUSE: { label: 'Refusé', color: 'bg-rose-100 text-rose-700 border-rose-200' },
 };
 
 function difficultyLabel(d: number | null): string {
@@ -37,8 +43,7 @@ export default function Games() {
   const [games, setGames] = useState<GameDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,38 +63,17 @@ export default function Games() {
     return () => { cancelled = true; };
   }, []);
 
-  const toggleGameActive = async (game: GameDTO, e: React.MouseEvent) => {
+  const handleUpdateStatus = async (id: number, etat: 'ACCEPTE' | 'REFUSE', e: React.MouseEvent) => {
     e.stopPropagation();
-    setTogglingId(game.id);
+    setStatusUpdatingId(id);
     try {
-      const res = await adminApi.updateGame(game.id, { actif: !game.actif });
-      setGames((prev) => prev.map((g) => (g.id === game.id ? res.data : g)));
-      toast.success(game.actif ? 'Jeu désactivé.' : 'Jeu activé.');
+      const res = await adminApi.updateGameStatus(id, etat);
+      setGames((prev) => prev.map((g) => (g.id === id ? res.data : g)));
+      toast.success(etat === 'ACCEPTE' ? 'Jeu accepté !' : 'Jeu refusé.');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || (err as Error)?.message
-        || 'Erreur lors du changement de statut.';
-      toast.error(msg);
+      toast.error('Erreur lors de la mise à jour du statut.');
     } finally {
-      setTogglingId(null);
-    }
-  };
-
-  const handleDelete = async (game: GameDTO, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`Supprimer le jeu « ${game.titre} » ? Cette action est irréversible.`)) return;
-    setDeletingId(game.id);
-    try {
-      await adminApi.deleteGame(game.id);
-      setGames((prev) => prev.filter((g) => g.id !== game.id));
-      toast.success('Jeu supprimé.');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || (err as Error)?.message
-        || 'Erreur lors de la suppression.';
-      toast.error(msg);
-    } finally {
-      setDeletingId(null);
+      setStatusUpdatingId(null);
     }
   };
 
@@ -97,18 +81,10 @@ export default function Games() {
     <div className="p-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Games</h1>
-              <p className="text-gray-600">Create and manage educational games</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Game Moderation</h1>
+              <p className="text-gray-600">Review and approve games created by educators</p>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/admin/games/add')}
-              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium"
-            >
-              <Plus className="w-5 h-5" />
-              Add New Game
-            </motion.button>
+            {/* Le bouton Add New Game est retiré pour l'admin car c'est le rôle de l'éducateur maintenant */}
           </div>
 
           {loading && (
@@ -143,7 +119,12 @@ export default function Games() {
                     {game.icone ?? TYPE_ICONS[game.typeJeu] ?? '🎮'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-900 truncate">{game.titre}</h3>
+                    <div className="flex items-center gap-2">
+                       <h3 className="text-lg font-bold text-gray-900 truncate">{game.titre}</h3>
+                       <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${STATUS_LABELS[game.etat]?.color ?? ''}`}>
+                         {STATUS_LABELS[game.etat]?.label ?? game.etat}
+                       </span>
+                    </div>
                     <p className="text-sm text-gray-500 mt-0.5">{formatLabel(game.typeJeu)}</p>
                   </div>
                 </div>
@@ -172,52 +153,34 @@ export default function Games() {
                     <span>— parties</span>
                   </div>
 
-                  {/* Bas : Active + Edit / Delete */}
                   <div className="pt-4 border-t border-gray-100 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-700">Active</span>
-                      <motion.button
-                        type="button"
-                        whileTap={{ scale: 0.98 }}
-                        onClick={(e) => toggleGameActive(game, e)}
-                        disabled={togglingId === game.id}
-                        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 disabled:opacity-60 ${game.actif ? 'bg-green-500' : 'bg-slate-300'}`}
-                        title={game.actif ? 'Désactiver' : 'Activer'}
-                      >
-                        {togglingId === game.id ? (
-                          <span className="absolute inset-0 flex items-center justify-center">
-                            <Loader2 className="w-3 h-3 text-white animate-spin" />
-                          </span>
-                        ) : (
-                          <span
-                            className={`pointer-events-none absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${game.actif ? 'translate-x-5' : 'translate-x-0'}`}
-                          />
-                        )}
-                      </motion.button>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${game.actif ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${game.actif ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        {game.actif ? 'Actif' : 'Inactif'}
+                      </span>
                     </div>
-                    <div className="flex gap-1.5">
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => navigate(`/admin/games/${game.id}/edit`)}
-                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                        title="Modifier"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e) => handleDelete(game, e)}
-                        disabled={deletingId === game.id}
-                        className="p-2 rounded-lg border border-red-200 bg-red-50/50 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        title="Supprimer"
-                      >
-                        {deletingId === game.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </motion.button>
-                    </div>
+
+                    {game.etat === 'EN_ATTENTE' ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => handleUpdateStatus(game.id, 'REFUSE', e)}
+                          disabled={statusUpdatingId === game.id}
+                          className="px-3 py-1.5 text-xs font-bold bg-rose-50 text-rose-600 rounded-lg border border-rose-200 hover:bg-rose-100 transition-colors disabled:opacity-50"
+                        >
+                          Refuser
+                        </button>
+                        <button
+                          onClick={(e) => handleUpdateStatus(game.id, 'ACCEPTE', e)}
+                          disabled={statusUpdatingId === game.id}
+                          className="px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                        >
+                          Accepter
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Lecture seule</span>
+                    )}
                   </div>
                 </div>
               </motion.article>

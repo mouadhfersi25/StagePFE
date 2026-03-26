@@ -3,6 +3,7 @@ package com.stage.auth.authbackend.controller.admin;
 import com.stage.auth.authbackend.dto.game.CreateGameRequest;
 import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
+import com.stage.auth.authbackend.entity.EtatJeu;
 import com.stage.auth.authbackend.service.admin.AdminGameService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,8 @@ import java.util.List;
 public class AdminGameController {
 
     private final AdminGameService adminGameService;
+    private final com.stage.auth.authbackend.service.educator.EducatorQuestionService educatorQuestionService;
+    private final com.stage.auth.authbackend.service.educator.EducatorMemoryService educatorMemoryService;
 
     /**
      * GET /api/admin/games
@@ -39,6 +42,24 @@ public class AdminGameController {
     @GetMapping("/{id}")
     public ResponseEntity<GameDTO> getGameById(@PathVariable Long id) {
         return ResponseEntity.ok(adminGameService.findGameById(id));
+    }
+
+    /**
+     * GET /api/admin/games/{id}/questions
+     * Liste les questions du jeu (type QUIZ) pour l'admin.
+     */
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<List<com.stage.auth.authbackend.dto.educator.QuizQuestionDTO>> getQuestionsByGameId(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorQuestionService.listByGame(id));
+    }
+
+    /**
+     * GET /api/admin/games/{id}/memory-cards
+     * Liste les cartes mémoire du jeu (type MEMOIRE) pour l'admin.
+     */
+    @GetMapping("/{id}/memory-cards")
+    public ResponseEntity<List<com.stage.auth.authbackend.dto.educator.MemoryCardDTO>> getMemoryCardsByGameId(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorMemoryService.listByGame(id));
     }
 
     /**
@@ -68,5 +89,14 @@ public class AdminGameController {
     public ResponseEntity<Void> deleteGame(@PathVariable Long id) {
         adminGameService.deleteGame(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * PATCH /api/admin/games/{id}/status
+     * Met à jour l'état d'un jeu
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<GameDTO> changeGameState(@PathVariable Long id, @RequestParam EtatJeu etat) {
+        return ResponseEntity.ok(adminGameService.changeGameState(id, etat));
     }
 }

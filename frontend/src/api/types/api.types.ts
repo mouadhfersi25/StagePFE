@@ -104,6 +104,9 @@ export type TypeJeu = 'QUIZ' | 'MEMOIRE' | 'REFLEXE' | 'LOGIQUE';
 /** Valeurs possibles pour modeJeu (backend enum ModeJeu) */
 export type ModeJeu = 'INDIVIDUEL' | 'COLLECTIF';
 
+/** Valeurs possibles pour l'état du jeu (backend enum EtatJeu) */
+export type EtatJeu = 'EN_ATTENTE' | 'ACCEPTE' | 'REFUSE';
+
 /** POST /api/admin/games - body */
 export interface CreateGameRequest {
   titre: string;
@@ -145,6 +148,7 @@ export interface GameDTO {
   actif: boolean;
   dureeMinutes: number | null;
   icone: string | null;
+  etat: EtatJeu;
   dateCreation: string | null;
 }
 

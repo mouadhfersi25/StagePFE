@@ -172,13 +172,16 @@ export default function AddGame() {
                     setErrors((p) => (msg ? { ...p, title: msg } : { ...p, title: '' }));
                   }}
                   className={`${inputClass} ${errors.title ? 'border-red-500' : ''}`}
-                  placeholder="ex. Math Master Quiz"
+                  placeholder=""
                 />
                 {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
               </div>
               <div>
                 <label className={`${labelClass} font-bold text-gray-700`}>Description du jeu *</label>
                 <textarea
+                  className={`${inputClass} min-h-[120px] resize-y ${errors.description ? 'border-red-500' : ''}`}
+                  placeholder=""
+                  rows={4}
                   value={formData.description}
                   onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
                   onBlur={() => {

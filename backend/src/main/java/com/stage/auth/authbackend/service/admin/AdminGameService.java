@@ -3,6 +3,7 @@ package com.stage.auth.authbackend.service.admin;
 import com.stage.auth.authbackend.dto.game.CreateGameRequest;
 import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
+import com.stage.auth.authbackend.entity.EtatJeu;
 import com.stage.auth.authbackend.entity.Jeu;
 import com.stage.auth.authbackend.exception.ApiException;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
@@ -67,6 +68,17 @@ public class AdminGameService {
     }
 
     /**
+     * Accepter ou refuser un jeu
+     */
+    public GameDTO changeGameState(Long id, EtatJeu etat) {
+        Jeu jeu = jeuRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+        jeu.setEtat(etat);
+        jeu = jeuRepository.save(jeu);
+        return toDTO(jeu);
+    }
+
+    /**
      * Crée un nouveau jeu (réservé à l'admin).
      */
     public GameDTO createGame(CreateGameRequest request) {
@@ -100,6 +112,7 @@ public class AdminGameService {
                 .actif(jeu.isActif())
                 .dureeMinutes(jeu.getDureeMinutes())
                 .icone(jeu.getIcone())
+                .etat(jeu.getEtat())
                 .dateCreation(jeu.getDateCreation())
                 .build();
     }

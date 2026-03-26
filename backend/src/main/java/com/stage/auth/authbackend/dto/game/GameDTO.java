@@ -1,6 +1,7 @@
 package com.stage.auth.authbackend.dto.game;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.stage.auth.authbackend.entity.EtatJeu;
 import com.stage.auth.authbackend.entity.ModeJeu;
 import com.stage.auth.authbackend.entity.TypeJeu;
 import lombok.*;
@@ -35,6 +36,8 @@ public class GameDTO {
     private Integer dureeMinutes;
 
     private String icone;
+
+    private EtatJeu etat;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime dateCreation;

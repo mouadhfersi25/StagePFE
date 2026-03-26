@@ -14,6 +14,10 @@ import type {
 const educatorApi = {
   getGames: () => api.get<GameDTO[]>(EDUCATOR_ENDPOINTS.GAMES),
   getGameById: (id: number | string) => api.get<GameDTO>(EDUCATOR_ENDPOINTS.GAME_BY_ID(id)),
+  createGame: (data: Record<string, unknown>) => api.post<GameDTO>(EDUCATOR_ENDPOINTS.GAMES, data),
+  updateGame: (id: number | string, data: Record<string, unknown>) =>
+    api.put<GameDTO>(EDUCATOR_ENDPOINTS.GAME_BY_ID(id), data),
+  deleteGame: (id: number | string) => api.delete(EDUCATOR_ENDPOINTS.GAME_BY_ID(id)),
   getQuestions: (gameId: number) =>
     api.get<QuizQuestionDTO[]>(EDUCATOR_ENDPOINTS.QUESTIONS, { params: { gameId } }),
   getQuestionById: (id: number) =>

@@ -46,7 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // Éducateur : gestion du contenu (questions, jeux, etc.)
-                        .requestMatchers("/api/educator/**").hasRole("EDUCATEUR")
+                        // Admin peut aussi consulter, afin d'éviter 403 pour /api/educator pour les admins.
+                        .requestMatchers("/api/educator/**").hasAnyRole("EDUCATEUR", "ADMIN")
 
                         // ➤ Utilisateurs authentifiés
                         .requestMatchers("/api/users/**").authenticated()

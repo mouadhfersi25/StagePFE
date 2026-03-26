@@ -4,6 +4,7 @@ import { ROLES } from "../../../utils/constants";
 import { formStyles } from "../../../styles/formStyles";
 import { useInputFocus } from "../../../hooks/useInputFocus";
 import { getErrorMessage } from "../../../utils/errorHandler";
+import { validateEmail, validatePassword } from "../../../utils/validators";
 
 export default function LoginForm() {
   const [form, setForm] = useState({
@@ -13,6 +14,7 @@ export default function LoginForm() {
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const errorPersistRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const { focusedField, handleFocus, handleBlur } = useInputFocus();
@@ -47,10 +49,47 @@ export default function LoginForm() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
+
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!form.email.trim()) {
+      errors.email = "Email requis";
+    } else if (!validateEmail(form.email)) {
+      errors.email = "Format email invalide";
+    }
+
+    if (!form.password) {
+      errors.password = "Mot de passe requis";
+    } else if (!validatePassword(form.password)) {
+      errors.password = "Le mot de passe doit contenir au moins 6 caractères";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    errorPersistRef.current = null;
+    setErrorMessage(null);
+
+    if (!validateForm()) {
+      const firstError =
+        fieldErrors.email ||
+        fieldErrors.password ||
+        "Veuillez corriger les erreurs dans le formulaire";
+      errorPersistRef.current = firstError;
+      setErrorMessage(firstError);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -107,7 +146,7 @@ export default function LoginForm() {
   return (
     <>
       <form onSubmit={handleSubmit} style={styles.form} noValidate>
-        {/* Affichage de l'erreur */}
+        {/* Affichage de l'erreur globale */}
         {(errorPersistRef.current || errorMessage) && (
           <div 
             key={`error-${errorPersistRef.current || errorMessage}`}
@@ -134,10 +173,27 @@ export default function LoginForm() {
               value={form.email}
               onChange={handleChange}
               onFocus={(e) => handleFocus('email', e)}
-              onBlur={(e) => handleBlur('email', false, e)}
-              style={styles.input}
+              onBlur={(e) => {
+                const hasError = !form.email.trim() || !validateEmail(form.email);
+                handleBlur('email', hasError, e);
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  email: !form.email.trim()
+                    ? "Email requis"
+                    : !validateEmail(form.email)
+                    ? "Format email invalide"
+                    : null,
+                }));
+              }}
+              style={{
+                ...styles.input,
+                ...(fieldErrors.email ? styles.inputError : {}),
+              }}
             />
           </div>
+          {fieldErrors.email && (
+            <span style={styles.errorText}>⚠️ {fieldErrors.email}</span>
+          )}
         </div>
 
         {/* Mot de passe */}
@@ -156,10 +212,27 @@ export default function LoginForm() {
               value={form.password}
               onChange={handleChange}
               onFocus={(e) => handleFocus('password', e)}
-              onBlur={(e) => handleBlur('password', false, e)}
-              style={styles.input}
+              onBlur={(e) => {
+                const hasError = !form.password || !validatePassword(form.password);
+                handleBlur('password', hasError, e);
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  password: !form.password
+                    ? "Mot de passe requis"
+                    : !validatePassword(form.password)
+                    ? "Le mot de passe doit contenir au moins 6 caractères"
+                    : null,
+                }));
+              }}
+              style={{
+                ...styles.input,
+                ...(fieldErrors.password ? styles.inputError : {}),
+              }}
             />
           </div>
+          {fieldErrors.password && (
+            <span style={styles.errorText}>⚠️ {fieldErrors.password}</span>
+          )}
           
           {/* Lien mot de passe oublié */}
           <div style={styles.forgotPassword}>

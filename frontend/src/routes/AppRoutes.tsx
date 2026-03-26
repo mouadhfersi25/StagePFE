@@ -29,6 +29,10 @@ import EducatorQuestions from "../pages/educator/Questions";
 import AddQuestion from "../pages/educator/AddQuestion";
 import EditQuestion from "../pages/educator/EditQuestion";
 import EducatorGames from "../pages/educator/EducatorGames";
+import EducatorManageGames from "../pages/educator/manage-games/EducatorManageGames";
+import EducatorAddGame from "../pages/educator/manage-games/EducatorAddGame";
+import EducatorEditGame from "../pages/educator/manage-games/EducatorEditGame";
+import EducatorGameTypeSection from "../pages/educator/manage-games/EducatorGameTypeSection";
 import GameQuestions from "../pages/educator/GameQuestions";
 import ConfigureMemoryGame from "../pages/educator/ConfigureMemoryGame";
 import EducatorStatistics from "../pages/educator/EducatorStatistics";
@@ -66,8 +70,6 @@ function AppRoutes() {
           <Route path="players/:id" element={<PlayerDetail />} />
           <Route path="players/:id/edit" element={<EditPlayer />} />
           <Route path="games" element={<Games />} />
-          <Route path="games/add" element={<AddGame />} />
-          <Route path="games/:id/edit" element={<EditGame />} />
           <Route path="games/:id" element={<GameDetail />} />
           <Route path="badges" element={<AdminBadges />} />
           <Route path="badges/add" element={<AddBadge />} />
@@ -81,6 +83,10 @@ function AppRoutes() {
         <Route path="/educator/questions/add" element={<PrivateRoute><AddQuestion /></PrivateRoute>} />
         <Route path="/educator/questions/:id/edit" element={<PrivateRoute><EditQuestion /></PrivateRoute>} />
         <Route path="/educator/games" element={<PrivateRoute><EducatorGames /></PrivateRoute>} />
+        <Route path="/educator/games/manage" element={<PrivateRoute><EducatorManageGames /></PrivateRoute>} />
+        <Route path="/educator/games/manage/add" element={<PrivateRoute><EducatorAddGame /></PrivateRoute>} />
+        <Route path="/educator/games/manage/:id/edit" element={<PrivateRoute><EducatorEditGame /></PrivateRoute>} />
+        <Route path="/educator/games/type/:type" element={<PrivateRoute><EducatorGameTypeSection /></PrivateRoute>} />
         <Route path="/educator/games/quiz/:gameId/questions" element={<PrivateRoute><GameQuestions /></PrivateRoute>} />
         <Route path="/educator/games/memory/:gameId/configure" element={<PrivateRoute><ConfigureMemoryGame /></PrivateRoute>} />
         <Route path="/educator/statistics" element={<PrivateRoute><EducatorStatistics /></PrivateRoute>} />

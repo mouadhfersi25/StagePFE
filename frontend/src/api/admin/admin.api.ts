@@ -1,7 +1,13 @@
 // Admin API
 import api from "../config/axiosConfig";
 import { ADMIN_ENDPOINTS } from "../config/endpoints";
-import type { CreateBadgeRequest, UpdateBadgeRequest } from "../types/api.types";
+import type {
+  CreateBadgeRequest,
+  UpdateBadgeRequest,
+  EtatJeu,
+  QuizQuestionDTO,
+  MemoryCardDTO,
+} from "../types/api.types";
 
 const adminApi = {
   getUsers: () => api.get(ADMIN_ENDPOINTS.USERS),
@@ -16,6 +22,10 @@ const adminApi = {
   createGame: (data: Record<string, unknown>) => api.post(ADMIN_ENDPOINTS.GAMES, data),
   updateGame: (id: number | string, data: Record<string, unknown>) =>
     api.put(ADMIN_ENDPOINTS.GAME_BY_ID(id), data),
+  updateGameStatus: (id: number | string, etat: EtatJeu) =>
+    api.patch(ADMIN_ENDPOINTS.GAME_STATUS(id), null, { params: { etat } }),
+  getGameQuestions: (id: number | string) => api.get<QuizQuestionDTO[]>(ADMIN_ENDPOINTS.GAME_QUESTIONS(id)),
+  getGameMemoryCards: (id: number | string) => api.get<MemoryCardDTO[]>(ADMIN_ENDPOINTS.GAME_MEMORY_CARDS(id)),
   deleteGame: (id: number | string) => api.delete(ADMIN_ENDPOINTS.GAME_BY_ID(id)),
   getBadges: () => api.get(ADMIN_ENDPOINTS.BADGES),
   getBadgeById: (id: number | string) => api.get(ADMIN_ENDPOINTS.BADGE_BY_ID(id)),

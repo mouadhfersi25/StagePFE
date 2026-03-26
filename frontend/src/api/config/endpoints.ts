@@ -23,6 +23,9 @@ export const ADMIN_ENDPOINTS = {
   USER_ROLE: (id: number | string) => `/admin/users/${id}/change-role`,
   GAMES: "/admin/games",
   GAME_BY_ID: (id: number | string) => `/admin/games/${id}`,
+  GAME_STATUS: (id: number | string) => `/admin/games/${id}/status`,
+  GAME_QUESTIONS: (id: number | string) => `/admin/games/${id}/questions`,
+  GAME_MEMORY_CARDS: (id: number | string) => `/admin/games/${id}/memory-cards`,
   BADGES: "/admin/badges",
   BADGE_BY_ID: (id: number | string) => `/admin/badges/${id}`,
 } as const;

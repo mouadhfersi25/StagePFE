@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router';
 import { motion } from 'motion/react';
-import { LayoutDashboard, HelpCircle, Gamepad2, BarChart3, LogOut } from 'lucide-react';
+import { LayoutDashboard, HelpCircle, Gamepad2, BarChart3, LogOut, Brain, Zap, Puzzle } from 'lucide-react';
 import { useAuth } from '@/context';
 import { useNavigate } from 'react-router';
 
@@ -8,7 +8,9 @@ interface NavItem {
   name: string;
   path: string;
   icon: React.ReactNode;
-  section: 'overview' | 'content' | 'insights';
+  section: 'overview' | 'content' | 'games' | 'insights';
+  badge?: string;
+  badgeColor?: string;
 }
 
 const navItems: NavItem[] = [
@@ -19,16 +21,42 @@ const navItems: NavItem[] = [
     section: 'overview',
   },
   {
-    name: 'Quiz Question Bank',
-    path: '/educator/questions',
-    icon: <HelpCircle className="w-5 h-5" />,
+    name: 'Manage Games',
+    path: '/educator/games/manage',
+    icon: <Gamepad2 className="w-5 h-5" />,
     section: 'content',
   },
   {
-    name: 'Game Content ',
-    path: '/educator/games',
-    icon: <Gamepad2 className="w-5 h-5" />,
-    section: 'content',
+    name: 'Quiz',
+    path: '/educator/games/type/quiz',
+    icon: <HelpCircle className="w-5 h-5" />,
+    section: 'games',
+    badge: '🧮',
+    badgeColor: 'bg-green-100 text-green-700',
+  },
+  {
+    name: 'Mémoire',
+    path: '/educator/games/type/memory',
+    icon: <Brain className="w-5 h-5" />,
+    section: 'games',
+    badge: '🧠',
+    badgeColor: 'bg-purple-100 text-purple-700',
+  },
+  {
+    name: 'Réflexe',
+    path: '/educator/games/type/reflex',
+    icon: <Zap className="w-5 h-5" />,
+    section: 'games',
+    badge: '⚡',
+    badgeColor: 'bg-yellow-100 text-yellow-700',
+  },
+  {
+    name: 'Logique',
+    path: '/educator/games/type/logic',
+    icon: <Puzzle className="w-5 h-5" />,
+    section: 'games',
+    badge: '🎯',
+    badgeColor: 'bg-blue-100 text-blue-700',
   },
   {
     name: 'Learning Statistics',
@@ -102,12 +130,12 @@ export default function EducatorSidebar() {
 
         {/* Content management */}
         <p className="px-3 mt-1 mb-1 text-[11px] font-semibold tracking-wide text-emerald-700/80 uppercase">
-          Quiz & Game Content
+          Gestion
         </p>
         {navItems
           .filter((item) => item.section === 'content')
           .map((item) => {
-            const isActive = location.pathname.startsWith(item.path);
+            const isActive = location.pathname === item.path;
             return (
               <Link key={item.path} to={item.path}>
                 <motion.div
@@ -119,11 +147,36 @@ export default function EducatorSidebar() {
                   }`}
                 >
                   {item.icon}
+                  <span className="font-medium text-sm">{item.name}</span>
+                </motion.div>
+              </Link>
+            );
+          })}
+
+        {/* Game types */}
+        <p className="px-3 mt-3 mb-1 text-[11px] font-semibold tracking-wide text-emerald-700/80 uppercase">
+          Types de jeux
+        </p>
+        {navItems
+          .filter((item) => item.section === 'games')
+          .map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <Link key={item.path} to={item.path}>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+                      : 'text-gray-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  {item.icon}
                   <div className="flex-1 flex items-center justify-between gap-2">
                     <span className="font-medium text-sm">{item.name}</span>
-                    {item.path === '/educator/questions' && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                        Quiz
+                    {item.badge && !isActive && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-md font-semibold ${item.badgeColor}`}>
+                        {item.badge}
                       </span>
                     )}
                   </div>
@@ -132,7 +185,7 @@ export default function EducatorSidebar() {
             );
           })}
 
-      
+
         {/* Insights */}
         <p className="px-3 mt-1 mb-1 text-[11px] font-semibold tracking-wide text-emerald-700/80 uppercase">Insights</p>
         {navItems

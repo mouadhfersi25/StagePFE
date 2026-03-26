@@ -41,7 +41,8 @@ public class Jeu {
     private ModeJeu modeJeu;
 
     @Column(name = "actif")
-    private boolean actif;
+    @Builder.Default
+    private boolean actif = false;
 
     @Column(name = "duree_minutes")
     private Integer dureeMinutes;
@@ -51,5 +52,9 @@ public class Jeu {
 
     @Column(name = "date_creation")
     private LocalDateTime dateCreation;
-}
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "etat")
+    @Builder.Default
+    private EtatJeu etat = EtatJeu.EN_ATTENTE;
+}
