@@ -42,6 +42,9 @@ public class UserDTO {
     private Long idRegion;
     /** id_pays (dérivé de region si présent, pour affichage) */
     private Long idPays;
+    private String paysNom;
+    private String regionNom;
+
     /** Joueur a complété pays/région/ville */
     private boolean onboardingCompleted;
     /** id_genre (FK vers genres) */

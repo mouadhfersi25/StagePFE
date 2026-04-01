@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Pencil, Trash2, Loader2, Award } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Award, LayoutGrid, List } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
@@ -33,6 +33,7 @@ export default function Badges() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   useEffect(() => {
     let cancelled = false;
@@ -69,32 +70,58 @@ export default function Badges() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-amber-50/30">
-      {/* Header */}
-      <div className="border-b border-slate-200/80 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-6 pt-6 pb-3">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-4 md:p-5 mb-5 shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 mb-3 border border-slate-200">
+            <Award className="w-4 h-4 text-violet-600" />
+            Gestion des badges
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                Gestion des badges
-              </h1>
-              <p className="mt-1 text-slate-600 text-sm sm:text-base">
-                Créez et gérez les badges de réussite pour les joueurs
-              </p>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Gestion des badges
+            </h1>
+            <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                aria-label="Vue cartes"
+                title="Vue cartes"
+                className={`p-2 rounded-xl transition-colors ${
+                  viewMode === 'cards' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                aria-label="Vue tableau"
+                title="Vue tableau"
+                className={`p-2 rounded-xl transition-colors ${
+                  viewMode === 'table' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <List className="w-4 h-4" />
+              </button>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/badges/add')}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-orange-500 to-rose-500 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-200"
-            >
-              <Plus className="w-5 h-5" />
-              Ajouter un badge
-            </motion.button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="flex justify-end mb-1">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/admin/badges/add')}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-500 to-cyan-500 shadow-lg shadow-violet-500/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-200"
+          >
+            <Plus className="w-5 h-5" />
+            Ajouter un badge
+          </motion.button>
+        </div>
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200/80 text-red-700 rounded-xl text-sm">
             {error}
@@ -129,8 +156,8 @@ export default function Badges() {
               Créer un badge
             </motion.button>
           </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        ) : viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {badges.map((badge, index) => {
               const style = ACCENTS[index % ACCENTS.length];
               return (
@@ -145,9 +172,9 @@ export default function Badges() {
                   {/* Barre d’accent en haut */}
                   <div className={`h-2 w-full bg-gradient-to-r ${style.gradient}`} />
 
-                  <div className="flex-1 flex flex-col p-6">
+                  <div className="flex-1 flex flex-col p-4">
                     {/* Icône + actions */}
-                    <div className="flex items-start justify-between gap-3 mb-5">
+                    <div className="flex items-start justify-between gap-3 mb-3">
                       <div
                         className={`flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br ${style.gradient} flex items-center justify-center text-4xl shadow-lg ring-4 ring-white`}
                       >
@@ -158,7 +185,7 @@ export default function Badges() {
                           whileHover={{ scale: 1.08 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => navigate(`/admin/badges/${badge.id}/edit`)}
-                          className="p-2.5 rounded-xl bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-600 transition-colors"
+                          className="p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
                           title="Modifier"
                         >
                           <Pencil className="w-4 h-4" />
@@ -168,7 +195,7 @@ export default function Badges() {
                           whileTap={{ scale: 0.95 }}
                           onClick={() => handleDelete(badge)}
                           disabled={deletingId === badge.id}
-                          className="p-2.5 rounded-xl bg-slate-100 hover:bg-red-100 text-slate-600 hover:text-red-600 transition-colors disabled:opacity-50"
+                          className="p-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
                           title="Supprimer"
                         >
                           {deletingId === badge.id ? (
@@ -202,6 +229,68 @@ export default function Badges() {
                 </motion.article>
               );
             })}
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600">Badge</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600">Description</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600">Condition</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {badges.map((badge) => (
+                    <tr key={badge.id} className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-xl">
+                            {badge.icone || '🏆'}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900">{badge.nom}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600 max-w-[360px]">
+                        <p className="line-clamp-2">{badge.description || 'Aucune description'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {getConditionLabel(badge)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/badges/${badge.id}/edit`)}
+                            className="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+                            title="Modifier"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(badge)}
+                            disabled={deletingId === badge.id}
+                            className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
+                            title="Supprimer"
+                          >
+                            {deletingId === badge.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

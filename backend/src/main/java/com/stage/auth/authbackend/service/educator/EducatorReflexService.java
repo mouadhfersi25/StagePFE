@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class EducatorReflexService {
@@ -34,7 +36,11 @@ public class EducatorReflexService {
         if (request.getNombreRounds() == null) {
             throw ApiException.badRequest("nombreRounds est requis");
         }
+        String modeleReflexe = normalizeModel(request.getModeleReflexe());
+        int noGoRatio = clamp(request.getNoGoRatio(), 10, 90, 30);
+        int choiceTargetCount = clamp(request.getChoiceTargetCount(), 2, 6, 3);
         Jeu jeu = validateJeuType(request.getJeuId(), TypeJeu.REFLEXE);
+        EducatorGameEditPolicy.requireDraft(jeu);
         ParametresReflexe params = parametresReflexeRepository.findByJeuId(jeu.getId()).orElse(null);
         if (params == null) {
             params = ParametresReflexe.builder()
@@ -42,16 +48,28 @@ public class EducatorReflexService {
                     .nombreRounds(request.getNombreRounds())
                     .tempsReactionMaxMs(request.getTempsReactionMaxMs())
                     .typeStimuli(request.getTypeStimuli())
+                    .modeleReflexe(modeleReflexe)
+                    .noGoRatio(noGoRatio)
+                    .choiceTargetCount(choiceTargetCount)
                     .difficulte(request.getDifficulte())
                     .build();
         } else {
             params.setNombreRounds(request.getNombreRounds());
             if (request.getTempsReactionMaxMs() != null) params.setTempsReactionMaxMs(request.getTempsReactionMaxMs());
             if (request.getTypeStimuli() != null) params.setTypeStimuli(request.getTypeStimuli());
+            params.setModeleReflexe(modeleReflexe);
+            params.setNoGoRatio(noGoRatio);
+            params.setChoiceTargetCount(choiceTargetCount);
             if (request.getDifficulte() != null) params.setDifficulte(request.getDifficulte());
         }
         params = parametresReflexeRepository.save(params);
+        touchGameContent(jeu);
         return toDTO(params, jeu);
+    }
+
+    private void touchGameContent(Jeu jeu) {
+        jeu.setLastContentUpdateAt(LocalDateTime.now());
+        jeuRepository.save(jeu);
     }
 
     private Jeu validateJeuType(Long jeuId, TypeJeu expected) {
@@ -71,7 +89,23 @@ public class EducatorReflexService {
                 .nombreRounds(p.getNombreRounds())
                 .tempsReactionMaxMs(p.getTempsReactionMaxMs())
                 .typeStimuli(p.getTypeStimuli())
+                .modeleReflexe(p.getModeleReflexe())
+                .noGoRatio(p.getNoGoRatio())
+                .choiceTargetCount(p.getChoiceTargetCount())
                 .difficulte(p.getDifficulte())
                 .build();
+    }
+
+    private static String normalizeModel(String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase();
+        if ("GO_NO_GO".equals(value) || "CHOICE_REACTION".equals(value) || "CLASSIC".equals(value)) {
+            return value;
+        }
+        return "CLASSIC";
+    }
+
+    private static int clamp(Integer value, int min, int max, int defaultValue) {
+        if (value == null) return defaultValue;
+        return Math.max(min, Math.min(max, value));
     }
 }

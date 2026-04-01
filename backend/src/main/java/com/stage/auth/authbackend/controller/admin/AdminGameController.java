@@ -1,14 +1,16 @@
 package com.stage.auth.authbackend.controller.admin;
 
 import com.stage.auth.authbackend.dto.game.CreateGameRequest;
+import com.stage.auth.authbackend.dto.game.ChangeGameStatusRequest;
+import com.stage.auth.authbackend.dto.game.GameAiReviewDTO;
 import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
-import com.stage.auth.authbackend.entity.EtatJeu;
 import com.stage.auth.authbackend.service.admin.AdminGameService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.List;
 public class AdminGameController {
 
     private final AdminGameService adminGameService;
+    private final com.stage.auth.authbackend.service.admin.AiGameReviewService aiGameReviewService;
     private final com.stage.auth.authbackend.service.educator.EducatorQuestionService educatorQuestionService;
     private final com.stage.auth.authbackend.service.educator.EducatorMemoryService educatorMemoryService;
 
@@ -42,6 +45,11 @@ public class AdminGameController {
     @GetMapping("/{id}")
     public ResponseEntity<GameDTO> getGameById(@PathVariable Long id) {
         return ResponseEntity.ok(adminGameService.findGameById(id));
+    }
+
+    @GetMapping("/{id}/ai-review")
+    public ResponseEntity<GameAiReviewDTO> getAiReview(@PathVariable Long id) {
+        return ResponseEntity.ok(aiGameReviewService.reviewGame(id));
     }
 
     /**
@@ -96,7 +104,12 @@ public class AdminGameController {
      * Met à jour l'état d'un jeu
      */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<GameDTO> changeGameState(@PathVariable Long id, @RequestParam EtatJeu etat) {
-        return ResponseEntity.ok(adminGameService.changeGameState(id, etat));
+    public ResponseEntity<GameDTO> changeGameState(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeGameStatusRequest request,
+            Authentication authentication
+    ) {
+        String adminEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(adminGameService.changeGameState(id, request.getEtat(), request.getMotifRefus(), adminEmail));
     }
 }

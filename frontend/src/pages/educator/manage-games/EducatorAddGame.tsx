@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
 import type { TypeJeu, ModeJeu } from '@/api/types';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import {
   validateRequired,
   validateInteger,
@@ -128,7 +129,7 @@ export default function EducatorAddGame() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      await educatorApi.createGame({
+      const created = await educatorApi.createGame({
         titre: formData.title.trim(),
         description: formData.description.trim() || undefined,
         difficulte: DIFFICULTY_TO_NUMBER[formData.difficulty],
@@ -140,8 +141,13 @@ export default function EducatorAddGame() {
         icone: formData.icon || undefined,
         actif: formData.actif,
       });
+
       toast.success('Jeu créé avec succès ! Il sera visible après validation par l\'administrateur.');
-      navigate('/educator/games/manage');
+      if (FORM_TYPE_TO_TYPE_JEU[formData.type] === 'REFLEXE' && created?.data?.id) {
+        navigate(`/educator/games/reflex/${created.data.id}/configure`, { state: { autoGenerateAi: true } });
+      } else {
+        navigate('/educator/games/manage');
+      }
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || (err as Error)?.message
@@ -159,7 +165,8 @@ export default function EducatorAddGame() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
-      <div className="flex-1 overflow-auto">
+      <EducatorHeader />
+      <div className="flex-1 overflow-auto pt-16">
         <div className="p-8 max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <button
@@ -314,6 +321,13 @@ export default function EducatorAddGame() {
                     {errors.estimatedTime && <p className="mt-1 text-sm text-red-600">{errors.estimatedTime}</p>}
                   </div>
                 </div>
+
+                {formData.type === 'reflex' && (
+                  <div className="mt-5 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4 text-sm text-cyan-900">
+                    La configuration Réflexe se fait dans une interface dédiée après création du jeu.
+                    Les champs seront pré-remplis automatiquement par IA.
+                  </div>
+                )}
               </section>
 
               <section className="mb-8">

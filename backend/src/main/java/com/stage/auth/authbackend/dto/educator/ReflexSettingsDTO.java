@@ -18,5 +18,8 @@ public class ReflexSettingsDTO {
     private Integer nombreRounds;
     private Integer tempsReactionMaxMs;
     private String typeStimuli;
+    private String modeleReflexe;
+    private Integer noGoRatio;
+    private Integer choiceTargetCount;
     private Integer difficulte;
 }

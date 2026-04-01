@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -60,6 +61,7 @@ public class EducatorQuestionService {
         if (jeu.getTypeJeu() != TypeJeu.QUIZ) {
             throw ApiException.badRequest("Impossible d'ajouter une question sur un jeu qui n'est pas de type QUIZ");
         }
+        EducatorGameEditPolicy.requireDraft(jeu);
         Question question = Question.builder()
                 .jeu(jeu)
                 .contenu(request.getContenu())
@@ -69,6 +71,7 @@ public class EducatorQuestionService {
                 .difficulte(request.getDifficulte())
                 .build();
         question = questionRepository.save(question);
+        touchGameContent(jeu);
         return toDTO(question, jeu);
     }
 
@@ -79,6 +82,7 @@ public class EducatorQuestionService {
         if (question.getJeu() == null || question.getJeu().getTypeJeu() != TypeJeu.QUIZ) {
             throw ApiException.badRequest("Cette question n'est pas liée à un jeu de type QUIZ");
         }
+        EducatorGameEditPolicy.requireDraft(question.getJeu());
         if (request.getContenu() != null) {
             question.setContenu(request.getContenu());
         }
@@ -95,6 +99,7 @@ public class EducatorQuestionService {
             question.setOptions(optionsToJson(request.getOptions()));
         }
         question = questionRepository.save(question);
+        touchGameContent(question.getJeu());
         return toDTO(question, question.getJeu());
     }
 
@@ -105,7 +110,14 @@ public class EducatorQuestionService {
         if (question.getJeu() == null || question.getJeu().getTypeJeu() != TypeJeu.QUIZ) {
             throw ApiException.badRequest("Cette question n'est pas liée à un jeu de type QUIZ");
         }
+        EducatorGameEditPolicy.requireDraft(question.getJeu());
+        touchGameContent(question.getJeu());
         questionRepository.delete(question);
+    }
+
+    private void touchGameContent(Jeu jeu) {
+        jeu.setLastContentUpdateAt(LocalDateTime.now());
+        jeuRepository.save(jeu);
     }
 
     private QuizQuestionDTO toDTO(Question question, Jeu jeu) {

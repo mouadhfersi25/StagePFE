@@ -1,7 +1,9 @@
 package com.stage.auth.authbackend.controller.educator;
 
 import com.stage.auth.authbackend.dto.educator.CreateOrUpdateReflexSettingsRequest;
+import com.stage.auth.authbackend.dto.educator.GenerateReflexSettingsPreviewRequest;
 import com.stage.auth.authbackend.dto.educator.ReflexSettingsDTO;
+import com.stage.auth.authbackend.service.educator.AiReflexGenerationService;
 import com.stage.auth.authbackend.service.educator.EducatorReflexService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class EducatorReflexController {
 
     private final EducatorReflexService educatorReflexService;
+    private final AiReflexGenerationService aiReflexGenerationService;
 
     @GetMapping
     public ResponseEntity<ReflexSettingsDTO> getByGame(@RequestParam Long gameId) {
@@ -30,5 +33,10 @@ public class EducatorReflexController {
     public ResponseEntity<ReflexSettingsDTO> createOrUpdate(@Valid @RequestBody CreateOrUpdateReflexSettingsRequest request) {
         ReflexSettingsDTO dto = educatorReflexService.createOrUpdate(request);
         return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/ai/generate-preview")
+    public ResponseEntity<ReflexSettingsDTO> generatePreview(@Valid @RequestBody GenerateReflexSettingsPreviewRequest request) {
+        return ResponseEntity.ok(aiReflexGenerationService.generatePreview(request.getGameId()));
     }
 }

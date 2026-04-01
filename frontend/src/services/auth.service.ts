@@ -40,6 +40,8 @@ export const authService = {
     storage.remove("jwt_token");
     storage.remove("auth_role");
     storage.remove("auth_email");
+    storage.remove("auth_prenom");
+    storage.remove("auth_nom");
   },
 
   isAuthenticated(): boolean {

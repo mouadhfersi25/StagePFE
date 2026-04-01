@@ -53,8 +53,23 @@ public class Jeu {
     @Column(name = "date_creation")
     private LocalDateTime dateCreation;
 
+    /**
+     * Date de dernière modification du contenu pédagogique du jeu
+     * (questions, cartes mémoire, puzzles, paramètres réflexe...).
+     * Ne doit pas être utilisée pour les métadonnées générales.
+     */
+    @Column(name = "last_content_update_at")
+    private LocalDateTime lastContentUpdateAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "etat")
     @Builder.Default
-    private EtatJeu etat = EtatJeu.EN_ATTENTE;
+    private EtatJeu etat = EtatJeu.BROUILLON;
+
+    /**
+     * Éducateur créateur du jeu (nullable pour les jeux créés directement par l'admin).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_educateur")
+    private User educateur;
 }

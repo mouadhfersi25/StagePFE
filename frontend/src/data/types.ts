@@ -16,6 +16,10 @@ export interface PlayerProfile {
   id: string;
   name: string;
   age: number;
+  avatar?: string;
+  onboardingCompleted?: boolean;
+  paysNom?: string;
+  regionNom?: string;
   level: number;
   xp: number;
   xpToNextLevel: number;

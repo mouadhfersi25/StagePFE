@@ -25,17 +25,20 @@ import EditBadge from "../pages/admin/manage-badges/EditBadge";
 import Moderation from "../pages/admin/moderation/Moderation";
 import Statistics from "../pages/admin/statistics/Statistics";
 import EducatorDashboard from "../pages/educator/EducatorDashboard";
-import EducatorQuestions from "../pages/educator/Questions";
 import AddQuestion from "../pages/educator/AddQuestion";
 import EditQuestion from "../pages/educator/EditQuestion";
 import EducatorGames from "../pages/educator/EducatorGames";
 import EducatorManageGames from "../pages/educator/manage-games/EducatorManageGames";
 import EducatorAddGame from "../pages/educator/manage-games/EducatorAddGame";
 import EducatorEditGame from "../pages/educator/manage-games/EducatorEditGame";
+import EducatorViewGame from "../pages/educator/manage-games/EducatorViewGame";
 import EducatorGameTypeSection from "../pages/educator/manage-games/EducatorGameTypeSection";
 import GameQuestions from "../pages/educator/GameQuestions";
+import ViewQuestion from "../pages/educator/ViewQuestion";
 import ConfigureMemoryGame from "../pages/educator/ConfigureMemoryGame";
+import ConfigureReflexGame from "../pages/educator/ConfigureReflexGame";
 import EducatorStatistics from "../pages/educator/EducatorStatistics";
+import EducatorManageProfile from "../pages/educator/profile/EducatorManageProfile";
 import PlayerDashboard from "../pages/player/PlayerDashboard";
 import NewGame from "../pages/player/NewGame";
 import WaitingRoom from "../pages/player/WaitingRoom";
@@ -79,17 +82,21 @@ function AppRoutes() {
           <Route path="me/edit" element={<AdminEditMyProfile />} />
         </Route>
         <Route path="/educator/dashboard" element={<PrivateRoute><EducatorDashboard /></PrivateRoute>} />
-        <Route path="/educator/questions" element={<PrivateRoute><EducatorQuestions /></PrivateRoute>} />
+        <Route path="/educator/questions" element={<Navigate to="/educator/games/manage" replace />} />
         <Route path="/educator/questions/add" element={<PrivateRoute><AddQuestion /></PrivateRoute>} />
         <Route path="/educator/questions/:id/edit" element={<PrivateRoute><EditQuestion /></PrivateRoute>} />
+        <Route path="/educator/questions/:id/view" element={<PrivateRoute><ViewQuestion /></PrivateRoute>} />
         <Route path="/educator/games" element={<PrivateRoute><EducatorGames /></PrivateRoute>} />
         <Route path="/educator/games/manage" element={<PrivateRoute><EducatorManageGames /></PrivateRoute>} />
         <Route path="/educator/games/manage/add" element={<PrivateRoute><EducatorAddGame /></PrivateRoute>} />
         <Route path="/educator/games/manage/:id/edit" element={<PrivateRoute><EducatorEditGame /></PrivateRoute>} />
+        <Route path="/educator/games/manage/:id/view" element={<PrivateRoute><EducatorViewGame /></PrivateRoute>} />
         <Route path="/educator/games/type/:type" element={<PrivateRoute><EducatorGameTypeSection /></PrivateRoute>} />
         <Route path="/educator/games/quiz/:gameId/questions" element={<PrivateRoute><GameQuestions /></PrivateRoute>} />
         <Route path="/educator/games/memory/:gameId/configure" element={<PrivateRoute><ConfigureMemoryGame /></PrivateRoute>} />
+        <Route path="/educator/games/reflex/:gameId/configure" element={<PrivateRoute><ConfigureReflexGame /></PrivateRoute>} />
         <Route path="/educator/statistics" element={<PrivateRoute><EducatorStatistics /></PrivateRoute>} />
+        <Route path="/educator/profile" element={<PrivateRoute><EducatorManageProfile /></PrivateRoute>} />
         <Route path="/player/dashboard" element={<PrivateRoute><PlayerDashboard /></PrivateRoute>} />
         <Route path="/player/new-game" element={<PrivateRoute><NewGame /></PrivateRoute>} />
         <Route path="/player/waiting-room/:gameId" element={<PrivateRoute><WaitingRoom /></PrivateRoute>} />

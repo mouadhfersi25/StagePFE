@@ -17,7 +17,7 @@ import {
 const badgeIcons = ['🏆', '🎮', '🎯', '🔥', '⚡', '📚', '🧠', '🧩', '💯', '⭐', '🌟', '🎖️'];
 
 const inputClass =
-  'w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-400 transition-colors';
+  'w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400 transition-colors';
 const labelClass = 'block text-sm font-semibold text-slate-700 mb-2';
 
 export default function EditBadge() {
@@ -110,7 +110,7 @@ export default function EditBadge() {
 
   if (fetchError) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-amber-50/20 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50/20 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-md text-center">
           <p className="text-slate-600 mb-6">{fetchError}</p>
           <button
@@ -127,8 +127,8 @@ export default function EditBadge() {
 
   if (!badge) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-amber-50/20 flex flex-col items-center justify-center gap-4 p-6">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-violet-50/20 flex flex-col items-center justify-center gap-4 p-6">
+        <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
         <p className="text-slate-500 text-sm">Chargement du badge…</p>
       </div>
     );
@@ -147,7 +147,7 @@ export default function EditBadge() {
             Retour aux badges
           </button>
           <div
-            className="w-full rounded-2xl shadow-md p-6 sm:p-8 bg-gradient-to-r from-orange-500 via-rose-500 to-pink-500"
+            className="w-full rounded-2xl shadow-md p-6 sm:p-8 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500"
             style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }}
           >
             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
@@ -167,7 +167,7 @@ export default function EditBadge() {
           transition={{ duration: 0.25 }}
           className="bg-white rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden"
         >
-          <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-rose-500 to-pink-500" />
+          <div className="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
           <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5" noValidate>
             {/* Nom */}
             <div>
@@ -211,7 +211,7 @@ export default function EditBadge() {
             {/* Condition */}
             <div className="rounded-xl bg-slate-50/80 border border-slate-100 p-4 space-y-3">
               <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Award className="w-4 h-4 text-amber-500" />
+                <Award className="w-4 h-4 text-violet-500" />
                 Condition de déblocage
               </h3>
               <div>
@@ -281,7 +281,7 @@ export default function EditBadge() {
                     onClick={() => { setFormData({ ...formData, icone: icon }); setErrors((p) => ({ ...p, icone: '' })); }}
                     className={`w-14 h-14 flex items-center justify-center text-2xl rounded-xl border-2 transition-all ${
                       formData.icone === icon
-                        ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-rose-50 shadow-md ring-2 ring-orange-500/30'
+                        ? 'border-violet-500 bg-gradient-to-br from-violet-50 to-cyan-50 shadow-md ring-2 ring-violet-500/30'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
@@ -299,7 +299,7 @@ export default function EditBadge() {
                 whileTap={{ scale: 0.98 }}
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-orange-500 to-rose-500 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all disabled:opacity-60"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-500 to-cyan-500 shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 transition-all disabled:opacity-60"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Enregistrer

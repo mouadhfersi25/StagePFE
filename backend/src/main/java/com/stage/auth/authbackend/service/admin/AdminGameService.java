@@ -4,9 +4,15 @@ import com.stage.auth.authbackend.dto.game.CreateGameRequest;
 import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
 import com.stage.auth.authbackend.entity.EtatJeu;
+import com.stage.auth.authbackend.entity.GameReviewAction;
+import com.stage.auth.authbackend.entity.GameReviewHistory;
 import com.stage.auth.authbackend.entity.Jeu;
+import com.stage.auth.authbackend.entity.User;
 import com.stage.auth.authbackend.exception.ApiException;
+import com.stage.auth.authbackend.repository.game.GameReviewHistoryRepository;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
+import com.stage.auth.authbackend.repository.user.UserRepository;
+import com.stage.auth.authbackend.service.auth.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,13 +25,16 @@ import java.util.stream.Collectors;
 public class AdminGameService {
 
     private final JeuRepository jeuRepository;
+    private final GameReviewHistoryRepository gameReviewHistoryRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
 
     /**
      * Liste tous les jeux (réservé à l'admin).
      */
     public List<GameDTO> findAllGames() {
         return jeuRepository.findAll().stream()
-                .map(AdminGameService::toDTO)
+                .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
@@ -70,11 +79,56 @@ public class AdminGameService {
     /**
      * Accepter ou refuser un jeu
      */
-    public GameDTO changeGameState(Long id, EtatJeu etat) {
+    public GameDTO changeGameState(Long id, EtatJeu etat, String motifRefus, String adminEmail) {
+        if (etat == EtatJeu.BROUILLON) {
+            throw ApiException.badRequest("L'état BROUILLON est réservé à l'éducateur");
+        }
+        if (etat == EtatJeu.EN_ATTENTE) {
+            throw ApiException.badRequest("L'état EN_ATTENTE est réservé à la soumission éducateur");
+        }
         Jeu jeu = jeuRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+
+        if (jeu.getEtat() != EtatJeu.EN_ATTENTE) {
+            throw ApiException.badRequest("Seuls les jeux en attente peuvent être traités");
+        }
+
+        String normalizedMotif = motifRefus != null ? motifRefus.trim() : null;
+        if (etat == EtatJeu.REFUSE && (normalizedMotif == null || normalizedMotif.isBlank())) {
+            throw ApiException.badRequest("Le motif de refus est obligatoire");
+        }
+
+        User admin = null;
+        if (adminEmail != null && !adminEmail.isBlank()) {
+            admin = userRepository.findByEmail(adminEmail.trim().toLowerCase()).orElse(null);
+        }
+
         jeu.setEtat(etat);
         jeu = jeuRepository.save(jeu);
+
+        GameReviewHistory review = GameReviewHistory.builder()
+                .jeu(jeu)
+                .admin(admin)
+                .action(etat == EtatJeu.ACCEPTE ? GameReviewAction.ACCEPTE : GameReviewAction.REFUSE)
+                .motifRefus(etat == EtatJeu.REFUSE ? normalizedMotif : null)
+                .createdAt(LocalDateTime.now())
+                .build();
+        gameReviewHistoryRepository.save(review);
+
+        if (etat == EtatJeu.ACCEPTE) {
+            if (jeu.getEducateur() != null
+                    && jeu.getEducateur().getEmail() != null
+                    && !jeu.getEducateur().getEmail().isBlank()) {
+                emailService.sendGameApprovedEmail(jeu.getEducateur().getEmail(), jeu.getTitre());
+            }
+        } else if (etat == EtatJeu.REFUSE) {
+            if (jeu.getEducateur() != null
+                    && jeu.getEducateur().getEmail() != null
+                    && !jeu.getEducateur().getEmail().isBlank()) {
+                emailService.sendGameRejectedEmail(jeu.getEducateur().getEmail(), jeu.getTitre(), normalizedMotif);
+            }
+        }
+
         return toDTO(jeu);
     }
 
@@ -93,13 +147,19 @@ public class AdminGameService {
                 .dureeMinutes(request.getDureeMinutes())
                 .icone(request.getIcone() != null && !request.getIcone().trim().isEmpty() ? request.getIcone().trim() : null)
                 .actif(request.getActif() != null ? request.getActif() : true)
+                .etat(EtatJeu.ACCEPTE)
                 .dateCreation(LocalDateTime.now())
                 .build();
         jeu = jeuRepository.save(jeu);
         return toDTO(jeu);
     }
 
-    private static GameDTO toDTO(Jeu jeu) {
+    private GameDTO toDTO(Jeu jeu) {
+        String latestRefusalReason = gameReviewHistoryRepository.findTopByJeuIdOrderByCreatedAtDescIdDesc(jeu.getId())
+                .filter(r -> r.getAction() == GameReviewAction.REFUSE)
+                .map(GameReviewHistory::getMotifRefus)
+                .orElse(null);
+
         return GameDTO.builder()
                 .id(jeu.getId())
                 .titre(jeu.getTitre())
@@ -113,6 +173,7 @@ public class AdminGameService {
                 .dureeMinutes(jeu.getDureeMinutes())
                 .icone(jeu.getIcone())
                 .etat(jeu.getEtat())
+                .latestRefusalReason(latestRefusalReason)
                 .dateCreation(jeu.getDateCreation())
                 .build();
     }

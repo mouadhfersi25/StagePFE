@@ -19,14 +19,10 @@ import {
 import { useAuth } from '@/context';
 import userApi from '@/api/user/user.api';
 import type { UserDTO } from '@/api/types/api.types';
-import PlayerOnboardingModal from '@/components/features/player/PlayerOnboardingModal';
-
-const ONBOARDING_DELAY_MS = 2000;
 
 export default function PlayerDashboard() {
   const navigate = useNavigate();
   const { playerProfile, logout } = useAuth();
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -42,31 +38,25 @@ export default function PlayerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (needsOnboarding !== true) return;
-    const t = setTimeout(() => setShowOnboarding(true), ONBOARDING_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [needsOnboarding]);
-
-  const handleOnboardingComplete = async () => {
-    setShowOnboarding(false);
-    try {
-      const res = await userApi.getMe();
-      const data = res.data as UserDTO;
-      const isPlayer = (data.role || "").toUpperCase() === "JOUEUR";
-      setNeedsOnboarding(isPlayer && !data.onboardingCompleted);
-    } catch {
-      setNeedsOnboarding(false);
+    if (needsOnboarding === true) {
+      navigate('/player/profile?onboarding=true');
     }
-  };
-
-  if (!playerProfile) return null;
-
-  const xpPercentage = (playerProfile.xp / playerProfile.xpToNextLevel) * 100;
+  }, [needsOnboarding, navigate]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  if (!playerProfile) return null;
+
+  const xpPercentage = (playerProfile.xp / playerProfile.xpToNextLevel) * 100;
+  const avatarValue = (playerProfile.avatar || '').trim();
+  const isImageAvatar =
+    avatarValue.startsWith('http://') ||
+    avatarValue.startsWith('https://') ||
+    avatarValue.startsWith('data:image/');
+  const isShortAvatarText = avatarValue.length > 0 && avatarValue.length <= 2;
 
   const dashboardCards = [
     { title: 'Progress', icon: TrendingUp, gradient: 'from-blue-500 to-cyan-600', action: () => navigate('/player/progress') },
@@ -77,9 +67,6 @@ export default function PlayerDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      {showOnboarding && (
-        <PlayerOnboardingModal onComplete={handleOnboardingComplete} />
-      )}
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
@@ -128,9 +115,19 @@ export default function PlayerDashboard() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring' }}
-                className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl border-4 border-white/30"
+                className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl border-4 border-white/30 overflow-hidden"
               >
-                👦
+                {isImageAvatar ? (
+                  <img
+                    src={avatarValue}
+                    alt="Avatar joueur"
+                    className="w-full h-full object-cover"
+                  />
+                ) : isShortAvatarText ? (
+                  avatarValue
+                ) : (
+                  '👦'
+                )}
               </motion.div>
               <div>
                 <h2 className="text-3xl font-bold mb-1">{playerProfile.name}</h2>

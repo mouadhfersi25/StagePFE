@@ -132,6 +132,7 @@ public class UserService {
                 });
 
         user.setRegion(region);
+        user.setAvatarUrl(request.getAvatarUrl());
         user.setOnboardingCompleted(true);
         userRepository.saveAndFlush(user);
 
@@ -155,7 +156,9 @@ public class UserService {
                 .scoreTotal(user.getScoreTotal())
                 .pointsExperience(user.getPointsExperience())
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
+                .regionNom(user.getRegion() != null ? user.getRegion().getNom() : null)
                 .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
+                .paysNom(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getNom() : null)
                 .onboardingCompleted(user.isOnboardingCompleted())
                 .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
                 .resetToken(user.getResetToken())

@@ -22,4 +22,7 @@ public class PlayerOnboardingRequest {
 
     @JsonProperty("regionNom")
     private String regionNom;
+
+    @JsonProperty("avatarUrl")
+    private String avatarUrl;
 }

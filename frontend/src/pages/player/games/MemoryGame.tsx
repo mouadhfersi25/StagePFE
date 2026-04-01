@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Clock, RotateCcw } from 'lucide-react';
-import { useAdminData } from '@/context';
+import userApi from '@/api/user/user.api';
+import type { MemoryCardDTO } from '@/api/types';
 
 const DEFAULT_EMOJIS = ['🎮', '🎯', '🎨', '🎭', '🎪', '🎸', '🎺', '🎹'];
 
 interface Card {
   id: number;
   emoji: string;
+  pairKey: string;
   flipped: boolean;
   matched: boolean;
 }
@@ -18,13 +20,14 @@ export default function MemoryGame() {
   const location = useLocation();
   const { gameId } = useParams();
   const { game, mode } = location.state || {};
-  const { gameConfigs } = useAdminData();
+  const [memoryCards, setMemoryCards] = useState<MemoryCardDTO[]>([]);
 
   const emojiList = useMemo(() => {
-    const config = gameId ? gameConfigs[gameId] : undefined;
-    if (config?.type === 'memory' && config.pairs.length >= 4) return config.pairs;
+    if (memoryCards.length >= 2) {
+      return memoryCards.map((c) => c.symbole);
+    }
     return DEFAULT_EMOJIS;
-  }, [gameId, gameConfigs]);
+  }, [memoryCards]);
 
   const [cards, setCards] = useState<Card[]>([]);
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
@@ -33,14 +36,47 @@ export default function MemoryGame() {
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
 
-  const totalPairs = emojiList.length;
+  const totalPairs = useMemo(() => {
+    if (memoryCards.length > 0) {
+      const keys = new Set(memoryCards.map((c) => c.pairKey).filter(Boolean));
+      if (keys.size > 0) return keys.size;
+      return Math.floor(memoryCards.length / 2);
+    }
+    return emojiList.length;
+  }, [memoryCards, emojiList.length]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    let cancelled = false;
+    userApi.getMemoryCardsByGame(gameId)
+      .then((res) => {
+        if (cancelled) return;
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setMemoryCards(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setMemoryCards([]);
+      });
+    return () => { cancelled = true; };
+  }, [gameId]);
 
   const initializeGame = () => {
-    const shuffledCards: Card[] = [...emojiList, ...emojiList]
+    const sourceCards: Array<{ emoji: string; pairKey: string }> = memoryCards.length > 0
+      ? memoryCards.map((c, index) => ({
+          emoji: c.symbole,
+          pairKey: c.pairKey || `pair-${Math.floor(index / 2)}`,
+        }))
+      : [...emojiList, ...emojiList].map((emoji, index) => ({
+          emoji,
+          pairKey: emoji || `pair-${Math.floor(index / 2)}`,
+        }));
+
+    const shuffledCards: Card[] = sourceCards
       .sort(() => Math.random() - 0.5)
-      .map((emoji, index) => ({
+      .map((entry, index) => ({
         id: index,
-        emoji,
+        emoji: entry.emoji,
+        pairKey: entry.pairKey,
         flipped: false,
         matched: false,
       }));
@@ -54,7 +90,7 @@ export default function MemoryGame() {
 
   useEffect(() => {
     initializeGame();
-  }, [gameId, emojiList]);
+  }, [gameId, emojiList, memoryCards]);
 
   // Timer
   useEffect(() => {
@@ -106,7 +142,7 @@ export default function MemoryGame() {
       setMoves(moves + 1);
       const [firstId, secondId] = newFlippedCards;
       
-      if (cards[firstId].emoji === cards[secondId].emoji) {
+      if (cards[firstId].pairKey === cards[secondId].pairKey) {
         // Match found
         setTimeout(() => {
           const matchedCards = [...cards];

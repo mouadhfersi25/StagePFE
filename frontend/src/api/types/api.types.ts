@@ -94,6 +94,7 @@ export interface ChangePasswordRequest {
 export interface PlayerOnboardingRequest {
   paysNom: string;
   regionNom: string;
+  avatarUrl?: string;
 }
 
 // ----- Admin Games (POST /api/admin/games) -----
@@ -105,7 +106,7 @@ export type TypeJeu = 'QUIZ' | 'MEMOIRE' | 'REFLEXE' | 'LOGIQUE';
 export type ModeJeu = 'INDIVIDUEL' | 'COLLECTIF';
 
 /** Valeurs possibles pour l'état du jeu (backend enum EtatJeu) */
-export type EtatJeu = 'EN_ATTENTE' | 'ACCEPTE' | 'REFUSE';
+export type EtatJeu = 'BROUILLON' | 'EN_ATTENTE' | 'ACCEPTE' | 'REFUSE';
 
 /** POST /api/admin/games - body */
 export interface CreateGameRequest {
@@ -149,7 +150,26 @@ export interface GameDTO {
   dureeMinutes: number | null;
   icone: string | null;
   etat: EtatJeu;
+  latestRefusalReason: string | null;
   dateCreation: string | null;
+}
+
+export interface ChangeGameStatusRequest {
+  etat: EtatJeu;
+  motifRefus?: string;
+}
+
+export interface GameAiReviewDTO {
+  gameId: number;
+  gameTitle: string;
+  model: string;
+  score: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  suggestedAction: 'REVIEW_OK' | 'REVIEW_REQUIRED' | 'HIGH_RISK' | string;
+  summary: string;
+  strengths: string[];
+  issues: string[];
+  recommendations: string[];
 }
 
 // ----- Admin Badges (GET/POST/PUT/DELETE /api/admin/badges) -----
@@ -232,6 +252,39 @@ export interface UpdateQuizQuestionRequest {
   options?: string[];
   explication?: string;
   difficulte?: number;
+}
+
+export interface GenerateQuizPreviewRequest {
+  gameId: number;
+  count?: number;
+}
+
+export interface ReflexSettingsDTO {
+  id: number;
+  jeuId: number;
+  jeuTitre: string;
+  nombreRounds: number;
+  tempsReactionMaxMs: number | null;
+  typeStimuli: string | null;
+  modeleReflexe: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | string;
+  noGoRatio: number | null;
+  choiceTargetCount: number | null;
+  difficulte: number | null;
+}
+
+export interface CreateOrUpdateReflexSettingsRequest {
+  jeuId: number;
+  nombreRounds: number;
+  tempsReactionMaxMs?: number;
+  typeStimuli?: string;
+  modeleReflexe?: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | string;
+  noGoRatio?: number;
+  choiceTargetCount?: number;
+  difficulte?: number;
+}
+
+export interface GenerateReflexSettingsPreviewRequest {
+  gameId: number;
 }
 
 // ----- Educator Memory (GET/POST/PUT/DELETE /api/educator/memory-cards) -----

@@ -15,6 +15,9 @@ import {
 } from '@/utils/formValidation';
 
 const badgeIcons = ['🏆', '🎮', '🎯', '🔥', '⚡', '📚', '🧠', '🧩', '💯', '⭐', '🌟', '🎖️'];
+const inputClass =
+  'w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400 transition-colors';
+const labelClass = 'block text-sm font-semibold text-slate-700 mb-2';
 
 export default function AddBadge() {
   const navigate = useNavigate();
@@ -82,27 +85,40 @@ export default function AddBadge() {
   };
 
   return (
-    <div className="p-8">
-          <div className="mb-6">
-            <button
-              onClick={() => navigate('/admin/badges')}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Badges
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">Add New Badge</h1>
-            <p className="text-gray-600 mt-1">Create a new achievement badge for players.</p>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 max-w-2xl"
+    <div className="min-h-screen bg-slate-100/80">
+      <div className="sticky top-0 z-10 pt-4 pb-6 px-6 bg-slate-100/80">
+        <div className="max-w-5xl mx-auto space-y-4">
+          <button
+            onClick={() => navigate('/admin/badges')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-800 font-medium text-sm shadow-sm hover:bg-slate-50 transition-colors"
           >
-            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+            <ArrowLeft className="w-4 h-4" />
+            Retour aux badges
+          </button>
+          <div
+            className="w-full rounded-2xl shadow-md p-6 sm:p-8 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500"
+            style={{ boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }}
+          >
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Ajouter un badge
+            </h1>
+            <p className="text-white/90 text-base sm:text-lg mt-1 font-medium">
+              Créez un nouveau badge de réussite.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden"
+        >
+          <div className="h-1.5 w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
+          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5" noValidate>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Badge Name *</label>
+                <label className={labelClass}>Nom du badge <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
                   value={formData.nom}
@@ -111,14 +127,14 @@ export default function AddBadge() {
                     const msg = validateRequired(formData.nom, 'Nom du badge requis') ?? validateMaxLength(formData.nom, 150, 'Maximum 150 caractères');
                     setErrors((prev) => (msg ? { ...prev, nom: msg } : { ...prev, nom: '' }));
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.nom ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="e.g., First Win"
+                  className={`${inputClass} ${errors.nom ? 'border-red-500' : ''}`}
+                  placeholder="ex. Premier succès"
                 />
                 {errors.nom && <p className="mt-1 text-sm text-red-600">{errors.nom}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+                <label className={labelClass}>Description <span className="text-rose-500">*</span></label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((prev) => ({ ...prev, description: '' })); }}
@@ -126,21 +142,26 @@ export default function AddBadge() {
                     const msg = validateRequired(formData.description, 'La description est requise') ?? validateMaxLength(formData.description ?? '', 255, 'Maximum 255 caractères');
                     setErrors((prev) => (msg ? { ...prev, description: msg } : { ...prev, description: '' }));
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 min-h-[80px] ${errors.description ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Describe the achievement..."
+                  className={`${inputClass} min-h-[100px] resize-y ${errors.description ? 'border-red-500' : ''}`}
+                  placeholder="Décrivez le badge..."
                 />
                 {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Condition de déblocage *</label>
+              <div className="rounded-xl bg-slate-50/80 border border-slate-100 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Save className="w-4 h-4 text-violet-500" />
+                  Condition de déblocage
+                </h3>
+                <div>
+                <label className={labelClass}>Condition de déblocage <span className="text-rose-500">*</span></label>
                 <select
                   value={formData.typeCondition}
                   onChange={(e) => {
                     setFormData({ ...formData, typeCondition: e.target.value as TypeConditionBadge | '', scoreCondition: '' });
                     setErrors((prev) => ({ ...prev, typeCondition: '' }));
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.typeCondition ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`${inputClass} ${errors.typeCondition ? 'border-red-500' : ''}`}
                 >
                   <option value="">— Choisir une condition —</option>
                   {BADGE_CONDITION_OPTIONS.map((opt) => (
@@ -151,10 +172,11 @@ export default function AddBadge() {
                 </select>
                 {errors.typeCondition && <p className="mt-1 text-sm text-red-600">{errors.typeCondition}</p>}
               </div>
+              </div>
 
               {needsValue && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={labelClass}>
                     Valeur {formData.typeCondition === 'SCORE_MIN' ? '(score min.)' : formData.typeCondition === 'GAMES_PLAYED' ? '(nombre de parties)' : '(nombre)'}
                   </label>
                   <input
@@ -169,7 +191,7 @@ export default function AddBadge() {
                       const msg = empty ? 'La valeur est requise' : validateNonNegativeNumber(formData.scoreCondition, 'La valeur doit être ≥ 0');
                       setErrors((prev) => (msg ? { ...prev, scoreCondition: msg } : { ...prev, scoreCondition: '' }));
                     }}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.scoreCondition ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`${inputClass} ${errors.scoreCondition ? 'border-red-500' : ''}`}
                     placeholder={formData.typeCondition === 'SCORE_MIN' ? 'ex. 100' : 'ex. 5'}
                   />
                   {errors.scoreCondition && <p className="mt-1 text-sm text-red-600">{errors.scoreCondition}</p>}
@@ -177,7 +199,7 @@ export default function AddBadge() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Icon *</label>
+                <label className={`${labelClass} mb-3`}>Icône <span className="text-rose-500">*</span></label>
                 <div className="flex flex-wrap gap-2">
                   {badgeIcons.map((icon) => (
                     <button
@@ -185,7 +207,7 @@ export default function AddBadge() {
                       type="button"
                       onClick={() => { setFormData({ ...formData, icone: icon }); setErrors((prev) => ({ ...prev, icone: '' })); }}
                       className={`w-12 h-12 flex items-center justify-center text-2xl rounded-lg border-2 transition-all ${
-                        formData.icone === icon ? 'border-orange-500 bg-orange-50 scale-110' : 'border-gray-200 hover:border-gray-300'
+                        formData.icone === icon ? 'border-violet-500 bg-violet-50 scale-110' : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       {icon}
@@ -195,16 +217,16 @@ export default function AddBadge() {
                 {errors.icone && <p className="mt-2 text-sm text-red-600">{errors.icone}</p>}
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium disabled:opacity-60"
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition-shadow font-medium disabled:opacity-60"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Create Badge
+                  Créer le badge
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -212,13 +234,14 @@ export default function AddBadge() {
                   type="button"
                   onClick={() => navigate('/admin/badges')}
                   disabled={loading}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-60"
+                  className="px-6 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
                 >
-                  Cancel
+                  Annuler
                 </motion.button>
               </div>
             </form>
           </motion.div>
+      </div>
     </div>
   );
 }

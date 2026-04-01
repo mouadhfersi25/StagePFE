@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { BarChart3, TrendingUp, Target } from 'lucide-react';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 const questionPerformance: { question: string; correct: number; incorrect: number; difficulty: string }[] = [];
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -8,12 +9,16 @@ export default function EducatorStatistics() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
       
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Question Statistics</h1>
-            <p className="text-gray-600">Analyze student performance on your questions</p>
+      <div className="flex-1 overflow-auto pt-16">
+        <div className="p-5 md:p-8 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100 min-h-full">
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-4 md:p-5 mb-8 shadow-sm">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 mb-3 border border-slate-200">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              Learning Statistics
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">Question Statistics</h1>
           </div>
 
           {/* Summary Cards */}

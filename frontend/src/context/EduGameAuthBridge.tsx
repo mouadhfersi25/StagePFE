@@ -5,12 +5,14 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
 import { AuthContext as StoreAuthContext } from '@/store/auth/AuthContext';
 import type { User, PlayerProfile } from '@/data/types';
+import userApi from '@/api/user/user.api';
 
 interface AuthContextType {
   user: User | null;
   playerProfile: PlayerProfile | null;
   login: (user: User) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   updatePlayerProfile: (updates: Partial<PlayerProfile>) => void;
 }
 
@@ -42,10 +44,54 @@ function mapStoreUserToEduGameUser(storeUser: { email?: string; role?: string } 
   };
 }
 
+function getLocalProfileFallback() {
+  if (typeof localStorage === 'undefined') {
+    return { paysNom: '', regionNom: '', avatar: '' };
+  }
+  return {
+    paysNom: localStorage.getItem('player_pays_nom') || '',
+    regionNom: localStorage.getItem('player_region_nom') || '',
+    avatar: localStorage.getItem('player_avatar') || '',
+  };
+}
+
 export function EduGameAuthBridge({ children }: { children: ReactNode }) {
   const storeAuth = useContext(StoreAuthContext);
   const user = useMemo(() => mapStoreUserToEduGameUser(storeAuth?.user ?? null), [storeAuth?.user]);
   const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
+
+  const refreshUser = async () => {
+    if (!user || user.role !== 'player') return;
+    try {
+      const { data } = await userApi.getMe();
+      const u = data as any;
+      const localFallback = getLocalProfileFallback();
+      const fullName = [u.prenom, u.nom].filter(Boolean).join(' ').trim();
+
+      setPlayerProfile((prev) => ({
+        ...prev!,
+        id: u.id || user.id,
+        name: fullName || u.name || user.name,
+        age: u.age || 12,
+        avatar: u.avatarUrl || u.avatar || localFallback.avatar || '👦',
+        onboardingCompleted: u.onboardingCompleted,
+        paysNom: u.paysNom || localFallback.paysNom || '',
+        regionNom: u.regionNom || localFallback.regionNom || '',
+        level: u.level || 1,
+        xp: u.xp || 0,
+        xpToNextLevel: 100,
+        totalScore: u.totalScore || 0,
+        badgesEarned: 0,
+        currentStreak: 0,
+        totalSessions: 0,
+        weeklyPlayTime: '0 min',
+        averageSuccessRate: 0,
+        skills: { math: 0, logic: 0, memory: 0, reflex: 0 },
+      }));
+    } catch (err) {
+      console.error("Failed to refresh user", err);
+    }
+  };
 
   // Initialiser un profil joueur par défaut dès qu'un user JOUEUR est connecté
   useEffect(() => {
@@ -53,24 +99,7 @@ export function EduGameAuthBridge({ children }: { children: ReactNode }) {
       setPlayerProfile(null);
       return;
     }
-    setPlayerProfile((prev) => {
-      if (prev) return prev;
-      return {
-        id: user.id,
-        name: user.name,
-        age: 12,
-        level: 1,
-        xp: 0,
-        xpToNextLevel: 100,
-        totalScore: 0,
-        badgesEarned: 0,
-        currentStreak: 0,
-        totalSessions: 0,
-        weeklyPlayTime: '0 min',
-        averageSuccessRate: 0,
-        skills: { math: 0, logic: 0, memory: 0, reflex: 0 },
-      };
-    });
+    refreshUser();
   }, [user]);
 
   const value = useMemo<AuthContextType>(
@@ -79,6 +108,7 @@ export function EduGameAuthBridge({ children }: { children: ReactNode }) {
       playerProfile,
       login: () => {},
       logout: () => storeAuth?.logout?.(),
+      refreshUser,
       updatePlayerProfile: (updates) =>
         setPlayerProfile((prev) => (prev ? { ...prev, ...updates } : prev)),
     }),

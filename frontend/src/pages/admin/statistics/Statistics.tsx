@@ -6,10 +6,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export default function Statistics() {
   return (
-    <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Global Statistics</h1>
-            <p className="text-gray-600">Comprehensive platform analytics and insights</p>
+    <div className="p-5 md:p-6 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100 min-h-full">
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-4 md:p-5 mb-5 shadow-sm">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 mb-3 border border-slate-200">
+              <TrendingUp className="w-4 h-4 text-violet-600" />
+              Global Statistics
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">Global Statistics</h1>
           </div>
 
           {/* Games Performance */}

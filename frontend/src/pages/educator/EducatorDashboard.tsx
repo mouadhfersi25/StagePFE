@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { HelpCircle, Gamepad2, Target, Users, TrendingUp, Clock } from 'lucide-react';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { EducatorDashboardStatsDTO } from '@/api/types/api.types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -75,13 +76,20 @@ export default function EducatorDashboard() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
       
       <div className="flex-1 overflow-auto">
-        <div className="p-8">
+        <div
+          className="p-5 md:p-8 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100 min-h-full"
+          style={{ paddingTop: '110px' }}
+        >
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Educator Dashboard</h1>
-            <p className="text-gray-600">Create and manage educational content</p>
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-4 md:p-5 mb-8 shadow-sm">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 mb-3 border border-slate-200">
+              <Target className="w-4 h-4 text-emerald-600" />
+              Educator Dashboard
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">Educator Dashboard</h1>
           </div>
 
           {/* Stats Grid - synchronisé BDD */}
@@ -185,18 +193,18 @@ export default function EducatorDashboard() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => window.location.href = '/educator/questions/add'}
+                onClick={() => window.location.href = '/educator/games/manage'}
                 className="px-6 py-3 bg-white text-green-600 rounded-lg font-medium hover:shadow-lg transition-shadow"
               >
-                Add New Question
+                Manage Games
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => window.location.href = '/educator/questions'}
+                onClick={() => window.location.href = '/educator/games/type/quiz'}
                 className="px-6 py-3 bg-white/20 text-white rounded-lg font-medium hover:bg-white/30 transition-colors border border-white/30"
               >
-                View All Questions
+                Quiz Games
               </motion.button>
             </div>
           </motion.div>

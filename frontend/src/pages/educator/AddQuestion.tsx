@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO, CreateQuizQuestionRequest } from '@/api/types/api.types';
 
@@ -49,7 +50,7 @@ export default function AddQuestion() {
       .then((res) => {
         if (cancelled) return;
         const list = Array.isArray(res.data) ? res.data : [];
-        setGames(list.filter((g) => g.typeJeu === 'QUIZ'));
+        setGames(list.filter((g) => g.typeJeu === 'QUIZ' && (g.etat === 'BROUILLON' || g.etat === 'REFUSE')));
       })
       .catch(() => {
         if (!cancelled) {
@@ -108,7 +109,7 @@ export default function AddQuestion() {
       .createQuestion(payload)
       .then(() => {
         toast.success('Question créée et associée au jeu.');
-        navigate('/educator/questions');
+        navigate(`/educator/games/quiz/${jeuId}/questions`);
       })
       .catch((err) => {
         toast.error(err.response?.data?.message || err.message || 'Erreur lors de la création.');
@@ -123,16 +124,17 @@ export default function AddQuestion() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto pt-16">
         <div className="p-8">
           <div className="mb-6">
             <button
-              onClick={() => navigate('/educator/questions')}
+              onClick={() => navigate('/educator/games/manage')}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-4 h-4" />
-              Retour aux questions
+              Retour aux jeux
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Ajouter une question</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -263,7 +265,13 @@ export default function AddQuestion() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="button"
-                  onClick={() => navigate('/educator/questions')}
+                  onClick={() => {
+                    if (formData.jeuId !== '') {
+                      navigate(`/educator/games/quiz/${formData.jeuId}/questions`);
+                    } else {
+                      navigate('/educator/games/manage');
+                    }
+                  }}
                   disabled={submitting}
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-60"
                 >

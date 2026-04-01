@@ -20,5 +20,8 @@ public class CreateOrUpdateReflexSettingsRequest {
 
     private Integer tempsReactionMaxMs;
     private String typeStimuli;
+    private String modeleReflexe;
+    private Integer noGoRatio;
+    private Integer choiceTargetCount;
     private Integer difficulte;
 }

@@ -2,28 +2,35 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Clock, CheckCircle, XCircle, Lightbulb } from 'lucide-react';
-import { useAdminData } from '@/context';
+import userApi from '@/api/user/user.api';
+import type { QuizQuestionDTO } from '@/api/types';
 
 export default function QuizGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { gameId } = useParams();
   const { game, mode } = location.state || {};
-  const { educatorQuestions } = useAdminData();
+  const [quizRows, setQuizRows] = useState<QuizQuestionDTO[]>([]);
 
   const questions = useMemo(() => {
-    const byGame = educatorQuestions
-      .filter((q) => q.gameId === gameId)
-      .map((q) => ({
+    const byGame = quizRows.map((q) => {
+      const options = Array.isArray(q.options) && q.options.length > 0 ? q.options : [q.bonneReponse];
+      let correctAnswer = options.findIndex((opt) => opt?.trim().toLowerCase() === (q.bonneReponse ?? '').trim().toLowerCase());
+      if (correctAnswer < 0) {
+        options.push(q.bonneReponse);
+        correctAnswer = options.length - 1;
+      }
+      return {
         id: q.id,
-        question: q.content,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        explanation: '',
+        question: q.contenu,
+        options,
+        correctAnswer,
+        explanation: q.explication || '',
         points: 10,
-      }));
+      };
+    });
     return byGame;
-  }, [educatorQuestions, gameId]);
+  }, [quizRows]);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -37,12 +44,27 @@ export default function QuizGame() {
   const isLastQuestion = currentQuestion === totalQuestions - 1;
 
   useEffect(() => {
+    if (!gameId) return;
+    let cancelled = false;
+    userApi.getQuizQuestionsByGame(gameId)
+      .then((res) => {
+        if (cancelled) return;
+        setQuizRows(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setQuizRows([]);
+      });
+    return () => { cancelled = true; };
+  }, [gameId]);
+
+  useEffect(() => {
     setAnsweredQuestions(new Array(questions.length).fill(false));
     setCurrentQuestion(0);
     setSelectedAnswer(null);
     setShowExplanation(false);
     setScore(0);
-  }, [gameId]);
+    setTimeLeft(180);
+  }, [gameId, questions.length]);
 
   // Timer
   useEffect(() => {

@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Calendar, Edit, Loader2, Tag, Target, Zap, Clock, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Edit, Loader2, Tag, Target, Zap, Clock, Gamepad2, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import educatorApi from '@/api/educator/educator.api';
-import type { GameDTO, EtatJeu, QuizQuestionDTO, MemoryCardDTO } from '@/api/types';
+import type { GameDTO, EtatJeu, QuizQuestionDTO, MemoryCardDTO, GameAiReviewDTO } from '@/api/types';
+import RejectGameModal from '@/components/admin/RejectGameModal';
 
 const TYPE_ICONS: Record<string, string> = {
   QUIZ: '🧮',
@@ -15,6 +16,7 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  BROUILLON: { label: 'Brouillon', color: 'bg-slate-100/90 text-slate-700 border-slate-200' },
   EN_ATTENTE: { label: 'En attente', color: 'bg-amber-100/90 text-amber-800 border-amber-200' },
   ACCEPTE: { label: 'Accepté', color: 'bg-emerald-100/90 text-emerald-800 border-emerald-200' },
   REFUSE: { label: 'Refusé', color: 'bg-rose-100/90 text-rose-800 border-rose-200' },
@@ -41,35 +43,6 @@ function formatLabel(value: string | null | undefined): string {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-type MemoryPair = {
-  categorie: string;
-  card1: import('@/api/types').MemoryCardDTO;
-  card2?: import('@/api/types').MemoryCardDTO;
-};
-
-function groupMemoryCards(cards: import('@/api/types').MemoryCardDTO[]): MemoryPair[] {
-  const map = new Map<string, import('@/api/types').MemoryCardDTO[]>();
-  for (const card of cards) {
-    const key = card.pairKey || `pair-${card.id ?? Math.random().toString(36).slice(2)}`;
-    const list = map.get(key) ?? [];
-    list.push(card);
-    map.set(key, list);
-  }
-
-  const pairs: MemoryPair[] = [];
-  map.forEach((list, key) => {
-    const categorie = list[0]?.categorie ?? '';
-    if (list.length >= 2) {
-      pairs.push({ categorie, card1: list[0], card2: list[1] });
-    } else {
-      pairs.push({ categorie, card1: list[0], card2: undefined });
-    }
-  });
-
-  // Garder l'ordre par clé / id pour stabilité
-  return pairs.sort((a, b) => (a.card1.id ?? 0) - (b.card1.id ?? 0));
-}
-
 export default function GameDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -78,21 +51,87 @@ export default function GameDetail() {
   const [error, setError] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestionDTO[]>([]);
   const [memoryCards, setMemoryCards] = useState<MemoryCardDTO[]>([]);
+  const [aiReview, setAiReview] = useState<GameAiReviewDTO | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const memoryPairs = useMemo(() => {
+    // Regroupe les cartes deux par deux via `pairKey`.
+    // Si `pairKey` est null, on considère chaque carte comme une "paire orpheline".
+    const byPairKey = new Map<string, MemoryCardDTO[]>();
+    for (const c of memoryCards) {
+      const key = c.pairKey ?? `orphan-${c.id}`;
+      if (!byPairKey.has(key)) byPairKey.set(key, []);
+      byPairKey.get(key)!.push(c);
+    }
+
+    const pairs = Array.from(byPairKey.entries()).map(([key, cards]) => {
+      const sorted = [...cards].sort((a, b) => a.id - b.id);
+      return {
+        key,
+        categorie: sorted[0]?.categorie ?? null,
+        cards: sorted,
+      };
+    });
+
+    // Tri stable : d'abord par id du premier élément, sinon par clé.
+    pairs.sort((a, b) => {
+      const aid = a.cards[0]?.id ?? 0;
+      const bid = b.cards[0]?.id ?? 0;
+      if (aid !== bid) return aid - bid;
+      return a.key.localeCompare(b.key);
+    });
+
+    return pairs;
+  }, [memoryCards]);
 
   const handleStatusUpdate = async (status: EtatJeu) => {
     if (!game) return;
+    if (status === 'REFUSE') {
+      setShowRejectModal(true);
+      return;
+    }
     setUpdatingStatus(true);
     try {
-      await adminApi.updateGameStatus(game.id, status);
-      setGame({ ...game, etat: status });
+      const res = await adminApi.updateGameStatus(game.id, status);
+      setGame(res.data);
       toast.success(status === 'ACCEPTE' ? 'Jeu accepté' : 'Jeu refusé');
     } catch (err) {
       toast.error('Erreur lors de la mise à jour du statut');
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const submitReject = async (reason: string) => {
+    if (!game) return;
+    setUpdatingStatus(true);
+    try {
+      const res = await adminApi.updateGameStatus(game.id, 'REFUSE', reason);
+      setGame(res.data);
+      toast.success('Jeu refusé');
+      setShowRejectModal(false);
+    } catch {
+      toast.error('Erreur lors de la mise à jour du statut');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const runAiReview = async () => {
+    if (!game) return;
+    setAiLoading(true);
+    try {
+      const res = await adminApi.getGameAiReview(game.id);
+      setAiReview(res.data);
+      toast.success('Analyse IA terminée');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Échec analyse IA');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -161,7 +200,7 @@ export default function GameDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+        <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
       </div>
     );
   }
@@ -172,7 +211,7 @@ export default function GameDetail() {
         <p className="text-gray-600">{error || 'Jeu introuvable'}</p>
         <button
           onClick={() => navigate('/admin/games')}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+          className="flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600"
         >
           <ArrowLeft className="w-4 h-4" />
           Retour à la liste
@@ -182,18 +221,28 @@ export default function GameDetail() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto min-h-[calc(100vh-6rem)] flex flex-col">
+    <div className="p-5 md:p-8 max-w-6xl mx-auto min-h-[calc(100vh-6rem)] flex flex-col bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
       {/* Barre du haut */}
       <div className="flex items-center justify-between mb-6 gap-4">
         <button
           type="button"
           onClick={() => navigate('/admin/games')}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-semibold shadow-sm hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 transition-all"
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
           Retour à la liste des jeux
         </button>
 
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={runAiReview}
+            disabled={aiLoading || game?.etat !== 'EN_ATTENTE'}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-semibold hover:bg-violet-100 disabled:opacity-60"
+          >
+            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {aiLoading ? 'Analyse...' : 'Analyser avec IA'}
+          </button>
         {game?.etat === 'EN_ATTENTE' && (
           <div className="flex items-center gap-2">
             <button
@@ -214,10 +263,11 @@ export default function GameDetail() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {/* En-tête gradient */}
-      <div className="h-28 rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-pink-500 flex items-center p-6 mb-6 shadow-lg">
+      <div className="h-28 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-500 flex items-center p-6 mb-6 shadow-lg">
         <div className="w-16 h-16 rounded-2xl bg-white/95 shadow-lg flex items-center justify-center text-3xl ring-2 ring-white/50 shrink-0">
           {game.icone ?? TYPE_ICONS[game.typeJeu] ?? '🎮'}
         </div>
@@ -229,10 +279,10 @@ export default function GameDetail() {
             </span>
           </div>
           <div className="flex flex-wrap gap-2 mt-1.5">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-white/95 text-orange-700 shadow-sm">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-white/95 text-violet-700 shadow-sm">
               {formatLabel(game.typeJeu)}
             </span>
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-white/95 text-pink-700 shadow-sm">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-white/95 text-cyan-700 shadow-sm">
               {formatLabel(game.modeJeu)}
             </span>
           </div>
@@ -245,12 +295,18 @@ export default function GameDetail() {
         <motion.section
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col min-h-[280px] lg:min-h-0"
+          className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col min-h-[280px] lg:min-h-0"
         >
           <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Description du jeu</p>
           <p className="text-gray-600 text-base leading-relaxed whitespace-pre-wrap flex-1">
             {game.description || 'Aucune description.'}
           </p>
+          {game.etat === 'REFUSE' && game.latestRefusalReason && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-rose-700 mb-1">Motif de refus</p>
+              <p className="text-sm text-rose-800 whitespace-pre-wrap">{game.latestRefusalReason}</p>
+            </div>
+          )}
         </motion.section>
 
         {/* Infos 2×3 — même hauteur que la description */}
@@ -258,9 +314,9 @@ export default function GameDetail() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[280px] lg:min-h-0"
+          className="lg:col-span-3 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-[280px] lg:min-h-0"
         >
-          <div className="grid grid-cols-2 lg:grid-cols-2 divide-x divide-y divide-gray-100 flex-1">
+          <div className="grid grid-cols-2 lg:grid-cols-2 divide-x divide-y divide-slate-100 flex-1">
             <div className="p-6 flex items-center gap-4">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${game.actif ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
                 <Tag className="w-6 h-6" />
@@ -304,7 +360,7 @@ export default function GameDetail() {
               </div>
             </div>
             <div className="p-6 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
                 <Calendar className="w-6 h-6" />
               </div>
               <div className="min-w-0">
@@ -316,8 +372,64 @@ export default function GameDetail() {
         </motion.section>
       </div>
 
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">Contenu du jeu</h2>
+      {aiReview && (
+        <div className="mt-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-bold text-slate-900 inline-flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-violet-600" />
+              Rapport de validation IA
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Score global</p>
+              <p className="text-2xl font-bold text-slate-900">{aiReview.score}/100</p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Niveau de risque</p>
+              <p className="text-lg font-bold text-slate-900">{aiReview.riskLevel}</p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Suggestion IA</p>
+              <p className="text-lg font-bold text-slate-900">{aiReview.suggestedAction}</p>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border border-violet-100 bg-violet-50 mb-4">
+            <p className="text-sm text-violet-900">{aiReview.summary}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50">
+              <p className="font-semibold text-emerald-900 mb-2">Points forts</p>
+              <ul className="text-sm text-emerald-800 list-disc pl-5 space-y-1">
+                {aiReview.strengths?.length ? aiReview.strengths.map((s) => <li key={s}>{s}</li>) : <li>—</li>}
+              </ul>
+            </div>
+            <div className="p-4 rounded-xl border border-rose-100 bg-rose-50">
+              <p className="font-semibold text-rose-900 mb-2 inline-flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4" />
+                Points à corriger
+              </p>
+              <ul className="text-sm text-rose-800 list-disc pl-5 space-y-1">
+                {aiReview.issues?.length ? aiReview.issues.map((s) => <li key={s}>{s}</li>) : <li>—</li>}
+              </ul>
+            </div>
+            <div className="p-4 rounded-xl border border-amber-100 bg-amber-50">
+              <p className="font-semibold text-amber-900 mb-2">Recommandations</p>
+              <ul className="text-sm text-amber-800 list-disc pl-5 space-y-1">
+                {aiReview.recommendations?.length ? aiReview.recommendations.map((s) => <li key={s}>{s}</li>) : <li>—</li>}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+      {game?.etat !== 'EN_ATTENTE' && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          L'analyse IA est disponible uniquement pour les jeux finalisés en attente de validation admin.
+        </div>
+      )}
+
+      <div className="mt-8 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <h2 className="text-lg font-bold text-slate-900 mb-3">Contenu du jeu</h2>
 
         {contentError && (
           <div className="mb-4 p-4 rounded-lg bg-rose-50 border border-rose-100 text-rose-700">
@@ -346,76 +458,91 @@ export default function GameDetail() {
 
         {contentLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
           </div>
         ) : game?.typeJeu === 'QUIZ' ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-4">
             {quizQuestions.length === 0 ? (
-              <div className="col-span-full p-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 text-center text-gray-600">
-                Aucune question de quiz n'a encore été ajoutée pour ce jeu.
-              </div>
+              <p className="text-slate-600">Aucune question de quiz n'a encore été ajoutée pour ce jeu.</p>
             ) : (
               quizQuestions.map((q, index) => (
-                <article
-                  key={q.id}
-                  className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="border-b border-gray-100 px-4 py-3 bg-gradient-to-r from-orange-50 via-orange-100 to-orange-50 rounded-t-2xl">
-                    <p className="text-xs uppercase tracking-wider text-orange-600 font-bold">Question {index + 1}</p>
-                    <p className="mt-1 text-sm font-semibold text-gray-800 truncate">{q.contenu || '—'}</p>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <p className="text-xs text-gray-500">Difficulté : <span className="font-bold text-gray-700">{difficultyLabel(q.difficulte)}</span></p>
-                    <p className="text-sm text-gray-900"><strong className="text-gray-800">Bonne réponse :</strong> {q.bonneReponse || '—'}</p>
-                    {q.options && q.options.length > 0 ? (
-                      <ul className="space-y-1 text-sm text-gray-700">
-                        {q.options.map((option) => (
-                          <li key={option} className="flex items-start gap-2">
-                            <span className="mt-1 inline-block h-2 w-2 rounded-full bg-orange-500" />
-                            <span>{option}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-gray-400">Pas d'options</p>
-                    )}
-                    {q.explication && (
-                      <p className="text-sm text-gray-500"><span className="font-semibold text-gray-700">Explication :</span> {q.explication}</p>
-                    )}
-                  </div>
-                </article>
+                <div key={q.id} className="p-4 rounded-xl border border-slate-100 bg-white">
+                  <p className="font-semibold text-sm">Question {index + 1}</p>
+                  <p className="mt-1 text-gray-700">{q.contenu}</p>
+                  <p className="text-xs text-gray-500 mt-1">Difficulté: {difficultyLabel(q.difficulte)}</p>
+                  <p className="text-sm mt-2"><strong>Bonne réponse :</strong> {q.bonneReponse}</p>
+                  {q.options && q.options.length > 0 && (
+                    <ul className="mt-1 list-disc pl-5 text-sm text-gray-700 space-y-1">
+                      {q.options.map((option) => (
+                        <li key={option}>{option}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {q.explication && <p className="text-sm text-gray-500 mt-2">Explication: {q.explication}</p>}
+                </div>
               ))
             )}
           </div>
         ) : game?.typeJeu === 'MEMOIRE' ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {memoryCards.length === 0 ? (
-              <div className="p-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 text-center text-gray-600">
-                Aucune paire mémoire n'a encore été ajoutée pour ce jeu.
-              </div>
+              <p className="text-slate-600">Aucune carte mémoire n'a encore été ajoutée pour ce jeu.</p>
             ) : (
-              groupMemoryCards(memoryCards).map((pair, index) => (
-                <article
-                  key={`${pair.card1.id ?? index}-${pair.card2?.id ?? 'empty'}`}
-                  className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-3xl">{pair.card1?.symbole || '❓'}</div>
-                    <span className="text-lg text-gray-400">↔</span>
-                    <div className="w-14 h-14 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-3xl">{pair.card2?.symbole || '❓'}</div>
+              memoryPairs.map((pair, idx) => {
+                const c1 = pair.cards[0];
+                const c2 = pair.cards[1];
+                return (
+                  <div key={pair.key} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
+                          🧠
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">Paire {idx + 1}</p>
+                          <p className="text-xs text-gray-500 truncate">Catégorie</p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                        {pair.categorie ?? '—'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3">
+                      {[c1, c2].map((c, i) => (
+                        <div
+                          key={c ? c.id : `placeholder-${pair.key}-${i}`}
+                          className={`w-20 h-20 rounded-xl border flex items-center justify-center ${
+                            c ? 'border-slate-200 bg-slate-50' : 'border-dashed border-slate-200 bg-white'
+                          }`}
+                        >
+                          {c ? (
+                            <div className="flex flex-col items-center leading-none">
+                              <span className="text-3xl">{c.symbole}</span>
+                              <span className="text-[10px] text-slate-500 mt-1">Carte {i + 1}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">—</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-600 truncate">Paire {index + 1}</p>
-                    <p className="text-base font-semibold text-gray-900">{pair.categorie || 'Sans catégorie'}</p>
-                  </div>
-                </article>
-              ))
+                );
+              })
             )}
           </div>
         ) : (
-          <p className="text-gray-600">Type de jeu non géré pour le pré-aperçu de contenu.</p>
+          <p className="text-slate-600">Type de jeu non géré pour le pré-aperçu de contenu.</p>
         )}
       </div>
+      <RejectGameModal
+        open={showRejectModal}
+        gameTitle={game.titre}
+        submitting={updatingStatus}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={submitReject}
+      />
     </div>
   );
 }

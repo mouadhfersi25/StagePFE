@@ -3,9 +3,20 @@ package com.stage.auth.authbackend.service.educator;
 import com.stage.auth.authbackend.dto.game.GameDTO;
 import com.stage.auth.authbackend.dto.game.CreateGameRequest;
 import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
+import com.stage.auth.authbackend.entity.EtatJeu;
+import com.stage.auth.authbackend.entity.GameReviewAction;
+import com.stage.auth.authbackend.entity.GameReviewHistory;
 import com.stage.auth.authbackend.entity.Jeu;
+import com.stage.auth.authbackend.entity.Role;
+import com.stage.auth.authbackend.entity.TypeJeu;
+import com.stage.auth.authbackend.entity.User;
 import com.stage.auth.authbackend.exception.ApiException;
+import com.stage.auth.authbackend.repository.game.CarteMemoireRepository;
+import com.stage.auth.authbackend.repository.game.GameReviewHistoryRepository;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
+import com.stage.auth.authbackend.repository.game.ParametresReflexeRepository;
+import com.stage.auth.authbackend.repository.game.QuestionRepository;
+import com.stage.auth.authbackend.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,11 +33,16 @@ import java.util.stream.Collectors;
 public class EducatorGameService {
 
     private final JeuRepository jeuRepository;
+    private final QuestionRepository questionRepository;
+    private final CarteMemoireRepository carteMemoireRepository;
+    private final ParametresReflexeRepository parametresReflexeRepository;
+    private final GameReviewHistoryRepository gameReviewHistoryRepository;
+    private final UserRepository userRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
     public List<GameDTO> findAllGames() {
         return jeuRepository.findAll().stream()
-                .map(EducatorGameService::toDTO)
+                .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
@@ -36,7 +52,16 @@ public class EducatorGameService {
         return toDTO(jeu);
     }
 
-    public GameDTO createGame(CreateGameRequest request) {
+    public GameDTO createGame(CreateGameRequest request, String educatorEmail) {
+        if (educatorEmail == null || educatorEmail.isBlank()) {
+            throw ApiException.unauthorized("Utilisateur éducateur non authentifié");
+        }
+        User educator = userRepository.findByEmail(educatorEmail.trim().toLowerCase())
+                .orElseThrow(() -> ApiException.unauthorized("Éducateur introuvable"));
+        if (educator.getRole() != Role.EDUCATEUR) {
+            throw ApiException.unauthorized("Seul un éducateur peut créer un jeu depuis cet endpoint");
+        }
+
         Jeu jeu = Jeu.builder()
                 .titre(request.getTitre().trim())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
@@ -48,7 +73,9 @@ public class EducatorGameService {
                 .dureeMinutes(request.getDureeMinutes())
                 .icone(request.getIcone() != null && !request.getIcone().trim().isEmpty() ? request.getIcone().trim() : null)
                 .actif(request.getActif() != null ? request.getActif() : true)
+                .etat(EtatJeu.BROUILLON)
                 .dateCreation(LocalDateTime.now())
+                .educateur(educator)
                 .build();
         jeu = jeuRepository.save(jeu);
         return toDTO(jeu);
@@ -57,6 +84,7 @@ public class EducatorGameService {
     public GameDTO updateGame(Long id, UpdateGameRequest request) {
         Jeu jeu = jeuRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+        EducatorGameEditPolicy.requireDraft(jeu);
         if (request.getTitre() != null) jeu.setTitre(request.getTitre().trim());
         if (request.getDescription() != null) jeu.setDescription(request.getDescription().trim());
         if (request.getDifficulte() != null) jeu.setDifficulte(request.getDifficulte());
@@ -67,18 +95,70 @@ public class EducatorGameService {
         if (request.getDureeMinutes() != null) jeu.setDureeMinutes(request.getDureeMinutes());
         if (request.getIcone() != null) jeu.setIcone(request.getIcone().trim().isEmpty() ? null : request.getIcone().trim());
         if (request.getActif() != null) jeu.setActif(request.getActif());
-        
-        // Reset state to pending so admin can validate the changes
-        jeu.setEtat(com.stage.auth.authbackend.entity.EtatJeu.EN_ATTENTE);
-        
+
         jeu = jeuRepository.save(jeu);
         return toDTO(jeu);
+    }
+
+    public GameDTO submitGame(Long id) {
+        Jeu jeu = jeuRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+        EducatorGameEditPolicy.requireDraft(jeu);
+
+        validateContentUpdatedAfterRefusal(jeu);
+        validateGameContentBeforeSubmit(jeu);
+        jeu.setEtat(EtatJeu.EN_ATTENTE);
+        jeu = jeuRepository.save(jeu);
+        return toDTO(jeu);
+    }
+
+    private void validateContentUpdatedAfterRefusal(Jeu jeu) {
+        if (jeu.getEtat() != EtatJeu.REFUSE) {
+            return;
+        }
+        GameReviewHistory lastRefusal = gameReviewHistoryRepository
+                .findTopByJeuIdAndActionOrderByCreatedAtDescIdDesc(jeu.getId(), GameReviewAction.REFUSE)
+                .orElse(null);
+        if (lastRefusal == null) {
+            return;
+        }
+
+        LocalDateTime lastContentUpdateAt = jeu.getLastContentUpdateAt();
+        if (lastContentUpdateAt == null || !lastContentUpdateAt.isAfter(lastRefusal.getCreatedAt())) {
+            throw ApiException.badRequest("Ce jeu a été refusé. Modifiez le contenu du jeu avant de le soumettre à nouveau.");
+        }
+    }
+
+    private void validateGameContentBeforeSubmit(Jeu jeu) {
+        // Validation de contenu selon le type de jeu.
+        if (jeu.getTypeJeu() == TypeJeu.QUIZ) {
+            if (questionRepository.findByJeuId(jeu.getId()).isEmpty()) {
+                throw ApiException.badRequest("Ajoutez au moins une question avant de finaliser ce jeu");
+            }
+            return;
+        }
+
+        if (jeu.getTypeJeu() == TypeJeu.MEMOIRE) {
+            if (carteMemoireRepository.findByJeuId(jeu.getId()).size() < 2) {
+                throw ApiException.badRequest("Ajoutez au moins une paire de cartes avant de finaliser ce jeu");
+            }
+            return;
+        }
+
+        if (jeu.getTypeJeu() == TypeJeu.REFLEXE) {
+            var reflex = parametresReflexeRepository.findByJeuId(jeu.getId()).orElse(null);
+            if (reflex == null || reflex.getNombreRounds() == null || reflex.getNombreRounds() < 1) {
+                throw ApiException.badRequest("Configurez les paramètres réflexe (au moins 1 round) avant de finaliser ce jeu");
+            }
+            return;
+        }
     }
 
     @org.springframework.transaction.annotation.Transactional
     public void deleteGame(Long id) {
         Jeu jeu = jeuRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+        // La suppression reste autorisée même après finalisation ; seules les modifications sont interdites.
 
         // Hibernate refuse la suppression d'un jeu lié car les relations ne sont pas en CascadeType.REMOVE ou Bidirectionnel complet.
         // On supprime proprement toutes les dépendances via EntityManager natif (plus léger et sécurisé pour un Hard Delete)
@@ -109,7 +189,12 @@ public class EducatorGameService {
         jeuRepository.delete(jeu);
     }
 
-    private static GameDTO toDTO(Jeu jeu) {
+    private GameDTO toDTO(Jeu jeu) {
+        String latestRefusalReason = gameReviewHistoryRepository.findTopByJeuIdOrderByCreatedAtDescIdDesc(jeu.getId())
+                .filter(r -> r.getAction() == GameReviewAction.REFUSE)
+                .map(GameReviewHistory::getMotifRefus)
+                .orElse(null);
+
         return GameDTO.builder()
                 .id(jeu.getId())
                 .titre(jeu.getTitre())
@@ -123,6 +208,7 @@ public class EducatorGameService {
                 .dureeMinutes(jeu.getDureeMinutes())
                 .icone(jeu.getIcone())
                 .etat(jeu.getEtat())
+                .latestRefusalReason(latestRefusalReason)
                 .dateCreation(jeu.getDateCreation())
                 .build();
     }

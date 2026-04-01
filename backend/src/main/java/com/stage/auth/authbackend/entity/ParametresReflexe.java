@@ -42,6 +42,24 @@ public class ParametresReflexe {
     private String typeStimuli;
 
     /**
+     * Modèle de gameplay réflexe : CLASSIC, GO_NO_GO, CHOICE_REACTION.
+     */
+    @Column(name = "modele_reflexe", length = 50)
+    private String modeleReflexe;
+
+    /**
+     * Ratio de pièges (0-100) utilisé pour GO_NO_GO.
+     */
+    @Column(name = "no_go_ratio")
+    private Integer noGoRatio;
+
+    /**
+     * Nombre de choix à afficher par round pour CHOICE_REACTION.
+     */
+    @Column(name = "choice_target_count")
+    private Integer choiceTargetCount;
+
+    /**
      * Niveau de difficulté spécifique (optionnel).
      */
     private Integer difficulte;

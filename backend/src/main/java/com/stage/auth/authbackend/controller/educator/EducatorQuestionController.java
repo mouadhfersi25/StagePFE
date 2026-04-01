@@ -1,8 +1,10 @@
 package com.stage.auth.authbackend.controller.educator;
 
 import com.stage.auth.authbackend.dto.educator.CreateQuizQuestionRequest;
+import com.stage.auth.authbackend.dto.educator.GenerateQuizPreviewRequest;
 import com.stage.auth.authbackend.dto.educator.QuizQuestionDTO;
 import com.stage.auth.authbackend.dto.educator.UpdateQuizQuestionRequest;
+import com.stage.auth.authbackend.service.educator.AiQuizGenerationService;
 import com.stage.auth.authbackend.service.educator.EducatorQuestionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * API éducateur : questions quiz. Synchronisé frontend educatorApi (getQuestions, getQuestionById, createQuestion, updateQuestion, deleteQuestion).
@@ -26,6 +29,7 @@ import java.util.List;
 public class EducatorQuestionController {
 
     private final EducatorQuestionService educatorQuestionService;
+    private final AiQuizGenerationService aiQuizGenerationService;
 
     @GetMapping
     public ResponseEntity<List<QuizQuestionDTO>> listByGame(@RequestParam Long gameId) {
@@ -55,5 +59,15 @@ public class EducatorQuestionController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         educatorQuestionService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/ai/ping")
+    public ResponseEntity<Map<String, Object>> pingAi() {
+        return ResponseEntity.ok(aiQuizGenerationService.ping());
+    }
+
+    @PostMapping("/ai/generate-preview")
+    public ResponseEntity<List<QuizQuestionDTO>> generatePreview(@Valid @RequestBody GenerateQuizPreviewRequest request) {
+        return ResponseEntity.ok(aiQuizGenerationService.generatePreview(request.getGameId(), request.getCount()));
     }
 }

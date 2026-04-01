@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, FileText } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO, TypeJeu, ModeJeu } from '@/api/types';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import {
   validateRequired,
   validateInteger,
@@ -23,6 +24,13 @@ const TYPE_ICONS: Record<string, string> = {
   LOGIQUE: '🎯',
 };
 
+const getContentEditPath = (game: Pick<GameDTO, 'id' | 'typeJeu'>): string | null => {
+  if (game.typeJeu === 'QUIZ') return `/educator/games/quiz/${game.id}/questions`;
+  if (game.typeJeu === 'MEMOIRE') return `/educator/games/memory/${game.id}/configure`;
+  if (game.typeJeu === 'REFLEXE') return `/educator/games/reflex/${game.id}/configure`;
+  return null;
+};
+
 const DIFFICULTY_NUMBER_TO_LABEL: Record<number, string> = {
   0: 'Easy', 1: 'Easy', 2: 'Easy', 3: 'Easy',
   4: 'Medium', 5: 'Medium', 6: 'Medium',
@@ -35,8 +43,14 @@ export default function EducatorEditGame() {
   const [game, setGame] = useState<GameDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'infos' | 'contenu'>('infos');
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<ValidationResult>({});
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [quizCount, setQuizCount] = useState(0);
+  const [memoryPairCount, setMemoryPairCount] = useState(0);
+  const [reflexRounds, setReflexRounds] = useState(0);
   const [formData, setFormData] = useState({
     titre: '',
     description: '',
@@ -78,6 +92,54 @@ export default function EducatorEditGame() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!game || loading) return;
+    if (game.etat === 'EN_ATTENTE' || game.etat === 'ACCEPTE') {
+      toast.info('Ce jeu est finalisé : vous ne pouvez plus modifier ses informations.');
+      navigate('/educator/games/manage', { replace: true });
+    }
+  }, [game, loading, navigate]);
+
+  useEffect(() => {
+    if (!game || activeTab !== 'contenu') return;
+    let cancelled = false;
+    setContentLoading(true);
+    setContentError(null);
+
+    const load = async () => {
+      try {
+        if (game.typeJeu === 'QUIZ') {
+          const res = await educatorApi.getQuestions(game.id);
+          if (!cancelled) setQuizCount(Array.isArray(res.data) ? res.data.length : 0);
+        } else if (game.typeJeu === 'MEMOIRE') {
+          const res = await educatorApi.getMemoryCards(game.id);
+          if (!cancelled) {
+            const cards = Array.isArray(res.data) ? res.data : [];
+            const keys = new Set(cards.map((c) => c.pairKey).filter(Boolean));
+            setMemoryPairCount(keys.size > 0 ? keys.size : Math.floor(cards.length / 2));
+          }
+        } else if (game.typeJeu === 'REFLEXE') {
+          const res = await educatorApi.getReflexSettings(game.id);
+          if (!cancelled) {
+            setReflexRounds(res.data?.nombreRounds ?? 0);
+          }
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+            || (err as Error)?.message
+            || 'Impossible de charger le contenu.';
+          setContentError(msg);
+        }
+      } finally {
+        if (!cancelled) setContentLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [game, activeTab]);
 
   const validate = (): boolean => {
     const ageMaxErr = validateInteger(formData.ageMax, 7, 18, 'Âge max entre 7 et 18')
@@ -130,6 +192,7 @@ export default function EducatorEditGame() {
   if (loading) return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+        <EducatorHeader />
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
       </div>
@@ -139,6 +202,7 @@ export default function EducatorEditGame() {
   if (error && !game) return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+        <EducatorHeader />
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
         <p className="text-gray-600">{error}</p>
         <button onClick={() => navigate('/educator/games/manage')} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">
@@ -150,23 +214,40 @@ export default function EducatorEditGame() {
 
   if (!game) return null;
 
+  if (game.etat === 'EN_ATTENTE' || game.etat === 'ACCEPTE') {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <EducatorSidebar />
+        <EducatorHeader />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+          <p className="text-gray-600 text-sm">Ce jeu est finalisé. Redirection…</p>
+        </div>
+      </div>
+    );
+  }
+
   const inputClass = "w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-gray-900 placeholder:text-gray-400";
   const labelClass = "block text-sm font-semibold text-gray-700 mb-1.5";
+  const contentEditPath = getContentEditPath(game);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
-      <div className="flex-1 overflow-auto">
+      <EducatorHeader />
+      <div className="flex-1 overflow-auto pt-16">
         <div className="p-8 max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <button
-              type="button"
-              onClick={() => navigate('/educator/games/manage')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-semibold shadow-sm hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 transition-all"
-            >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Retour à la liste des jeux
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => navigate('/educator/games/manage')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-semibold shadow-sm hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                Retour à la liste des jeux
+              </button>
+            </div>
           </div>
 
           <div className="h-28 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 flex items-end p-6 mb-8 shadow-lg">
@@ -176,19 +257,32 @@ export default function EducatorEditGame() {
             </div>
           </div>
 
-          {game.etat === 'ACCEPTE' && (
-            <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm flex items-start gap-2">
-              <span className="text-lg">ℹ️</span>
-              <p>Ce jeu est déjà <strong>accepté</strong>. Toute modification le remettra en statut <strong>En attente</strong> pour une nouvelle validation.</p>
-            </div>
-          )}
-
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
             className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
           >
+            <div className="px-8 pt-6">
+              <div className="inline-flex items-center rounded-xl border border-gray-200 bg-gray-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('infos')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'infos' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Infos du jeu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('contenu')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'contenu' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Contenu du jeu
+                </button>
+              </div>
+            </div>
+
+            {activeTab === 'infos' ? (
             <form onSubmit={handleSubmit} className="p-8" noValidate>
               {error && (
                 <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-medium">
@@ -308,6 +402,102 @@ export default function EducatorEditGame() {
                 </button>
               </div>
             </form>
+            ) : (
+              <div className="p-8">
+                <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
+                  <h2 className="text-lg font-bold text-emerald-900 mb-1">Contenu du jeu</h2>
+                  <p className="text-sm text-emerald-800">
+                    Gérez le contenu pédagogique lié à ce jeu depuis cet onglet.
+                  </p>
+                </div>
+
+                {contentLoading && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Chargement du contenu...
+                  </div>
+                )}
+
+                {!contentLoading && contentError && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
+                    {contentError}
+                  </div>
+                )}
+
+                {!contentLoading && !contentError && (
+                  <div className="space-y-4">
+                    {game.typeJeu === 'QUIZ' && (
+                      <div className="rounded-xl border border-gray-200 bg-white p-5">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Quiz</p>
+                            <p className="text-gray-900 font-semibold">{quizCount} question{quizCount > 1 ? 's' : ''} configurée{quizCount > 1 ? 's' : ''}</p>
+                          </div>
+                          {contentEditPath && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(contentEditPath)}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Ouvrir l'éditeur des questions
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {game.typeJeu === 'MEMOIRE' && (
+                      <div className="rounded-xl border border-gray-200 bg-white p-5">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Mémoire</p>
+                            <p className="text-gray-900 font-semibold">{memoryPairCount} paire{memoryPairCount > 1 ? 's' : ''} configurée{memoryPairCount > 1 ? 's' : ''}</p>
+                          </div>
+                          {contentEditPath && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(contentEditPath)}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Ouvrir l'éditeur des paires
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {game.typeJeu === 'REFLEXE' && (
+                      <div className="rounded-xl border border-gray-200 bg-white p-5">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Réflexe</p>
+                            <p className="text-gray-900 font-semibold">{reflexRounds} round{reflexRounds > 1 ? 's' : ''} configuré{reflexRounds > 1 ? 's' : ''}</p>
+                          </div>
+                          {contentEditPath && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(contentEditPath)}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Ouvrir la configuration Réflexe
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {game.typeJeu === 'LOGIQUE' && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
+                        L'édition intégrée du contenu n'est pas encore disponible pour ce type de jeu.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
       </div>

@@ -38,6 +38,7 @@ public class GameDTO {
     private String icone;
 
     private EtatJeu etat;
+    private String latestRefusalReason;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime dateCreation;

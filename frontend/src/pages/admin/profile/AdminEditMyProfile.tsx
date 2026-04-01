@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Save, Mail, User, Phone, Upload, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Mail, User, Phone, Upload, Loader2, Trash2, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { userService } from '@/services/user.service';
 import storage from '@/utils/storage';
 import type { UserDTO } from '@/data/types';
 import type { UpdateProfileRequest } from '@/api/types';
-import { validateRequired, validatePhone, validateMaxLength, type ValidationResult } from '@/utils/formValidation';
+import { validateRequired, validatePhone, validateMaxLength, validateMinLength, type ValidationResult } from '@/utils/formValidation';
 
 const MAX_IMAGE_SIZE_MB = 2;
 const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp,image/gif';
@@ -26,6 +26,11 @@ export default function AdminEditMyProfile() {
     prenom: '',
     telephone: '',
     avatarUrl: '',
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -134,6 +139,36 @@ export default function AdminEditMyProfile() {
       .finally(() => setSaving(false));
   };
 
+  const handlePasswordChange = async () => {
+    const pwdErrors: ValidationResult = {};
+    const currentErr = validateRequired(passwordForm.currentPassword, 'Le mot de passe actuel est requis');
+    if (currentErr) pwdErrors.currentPassword = currentErr;
+    const newErr = validateRequired(passwordForm.newPassword, 'Le nouveau mot de passe est requis')
+      ?? validateMinLength(passwordForm.newPassword, 6, 'Le nouveau mot de passe doit contenir au moins 6 caractères');
+    if (newErr) pwdErrors.newPassword = newErr;
+    if (passwordForm.confirmPassword !== passwordForm.newPassword) {
+      pwdErrors.confirmPassword = 'La confirmation du mot de passe ne correspond pas';
+    }
+    setErrors((prev) => ({ ...prev, ...pwdErrors }));
+    if (Object.keys(pwdErrors).length > 0) return;
+
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await userService.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Erreur lors du changement de mot de passe');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const avatarPreview = form.avatarUrl && (form.avatarUrl.startsWith('data:') || form.avatarUrl.startsWith('http'));
   const avatarInitial = (profile?.prenom?.[0] || profile?.nom?.[0] || profile?.email?.[0] || '?').toUpperCase();
 
@@ -154,18 +189,25 @@ export default function AdminEditMyProfile() {
   }
 
   return (
-    <div className="w-full py-8 px-4 sm:px-6">
+    <div className="w-full py-8 px-4 sm:px-6 bg-slate-50">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden"
+        className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
       >
-        <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-          <h1 className="text-xl font-semibold text-gray-900">Modifier mon profil</h1>
-          <p className="text-sm text-gray-500 mt-1">Mettez à jour vos informations personnelles.</p>
+        <div className="px-6 py-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Modifier mon profil</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Mettez à jour vos informations personnelles.</p>
+            </div>
+          </div>
         </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
+            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8" noValidate>
               {error && (
                 <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">
                   {error}
@@ -178,15 +220,20 @@ export default function AdminEditMyProfile() {
               )}
 
               {/* Avatar — upload depuis l'ordinateur */}
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-3">Photo de profil</p>
-                <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-200 text-slate-700">
+                    <Mail className="w-4 h-4 opacity-0" />
+                  </span>
+                  <p className="text-sm font-semibold text-slate-800">Photo de profil</p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start gap-5">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+                    <div className="w-28 h-28 rounded-2xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                       {avatarPreview ? (
                         <img src={form.avatarUrl!} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-2xl font-semibold text-gray-400">{avatarInitial}</span>
+                        <span className="text-2xl font-semibold text-slate-400">{avatarInitial}</span>
                       )}
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -200,7 +247,7 @@ export default function AdminEditMyProfile() {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
                       >
                         <Upload className="w-4 h-4" />
                         Choisir une image
@@ -209,33 +256,39 @@ export default function AdminEditMyProfile() {
                         <button
                           type="button"
                           onClick={removeAvatar}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                           Supprimer
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 text-center max-w-[200px]">JPEG, PNG, WebP ou GIF. Max 2 Mo.</p>
+                    <p className="text-xs text-slate-500 text-center max-w-[220px]">JPEG, PNG, WebP ou GIF. Max 2 Mo.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-6 space-y-5">
+              <div className="border-t border-slate-200 pt-6 space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    <Mail className="w-4 h-4 text-slate-500" />
+                    Email
+                  </label>
                   <input
                     type="email"
                     value={profile.email ?? ''}
                     readOnly
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 text-sm"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm"
                   />
-                  <p className="text-xs text-gray-400 mt-1">L’email ne peut pas être modifié.</p>
+                  <p className="text-xs text-slate-400 mt-1">L’email ne peut pas être modifié.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Prénom</label>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                      <User className="w-4 h-4 text-slate-500" />
+                      Prénom
+                    </label>
                     <input
                       type="text"
                       name="prenom"
@@ -246,13 +299,16 @@ export default function AdminEditMyProfile() {
                           ?? validateMaxLength(form.prenom ?? '', 100, 'Maximum 100 caractères');
                         setErrors((p) => (msg ? { ...p, prenom: msg } : { ...p, prenom: '' }));
                       }}
-                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.prenom ? 'border-red-500' : 'border-gray-200'}`}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.prenom ? 'border-red-500' : 'border-slate-200'}`}
                       placeholder="Prénom"
                     />
                     {errors.prenom && <p className="mt-1 text-sm text-red-600">{errors.prenom}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom</label>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                      <User className="w-4 h-4 text-slate-500" />
+                      Nom
+                    </label>
                     <input
                       type="text"
                       name="nom"
@@ -263,7 +319,7 @@ export default function AdminEditMyProfile() {
                           ?? validateMaxLength(form.nom ?? '', 100, 'Maximum 100 caractères');
                         setErrors((p) => (msg ? { ...p, nom: msg } : { ...p, nom: '' }));
                       }}
-                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.nom ? 'border-red-500' : 'border-gray-200'}`}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.nom ? 'border-red-500' : 'border-slate-200'}`}
                       placeholder="Nom"
                     />
                     {errors.nom && <p className="mt-1 text-sm text-red-600">{errors.nom}</p>}
@@ -271,7 +327,10 @@ export default function AdminEditMyProfile() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone *</label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    <Phone className="w-4 h-4 text-slate-500" />
+                    Téléphone *
+                  </label>
                   <input
                     type="text"
                     name="telephone"
@@ -281,21 +340,86 @@ export default function AdminEditMyProfile() {
                       const msg = validateRequired(form.telephone, 'Le téléphone est requis') ?? validatePhone(form.telephone);
                       setErrors((p) => (msg ? { ...p, telephone: msg } : { ...p, telephone: '' }));
                     }}
-                    className={`w-full px-4 py-2.5 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${errors.telephone ? 'border-red-500' : 'border-gray-200'}`}
+                    className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.telephone ? 'border-red-500' : 'border-slate-200'}`}
                     placeholder="8 chiffres"
                   />
                   {errors.telephone && <p className="mt-1 text-sm text-red-600">{errors.telephone}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-gray-100">
+              <div className="border-t border-slate-200 pt-6 space-y-4">
+                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-slate-500" />
+                  Changer le mot de passe
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Mot de passe actuel"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => {
+                        setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }));
+                        setErrors((prev) => ({ ...prev, currentPassword: '' }));
+                        setError(null);
+                        setSuccess(false);
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.currentPassword ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                    {errors.currentPassword && <p className="mt-1 text-sm text-red-600">{errors.currentPassword}</p>}
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Nouveau mot de passe"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => {
+                        setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }));
+                        setErrors((prev) => ({ ...prev, newPassword: '' }));
+                        setError(null);
+                        setSuccess(false);
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.newPassword ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                    {errors.newPassword && <p className="mt-1 text-sm text-red-600">{errors.newPassword}</p>}
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Confirmer le mot de passe"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => {
+                        setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }));
+                        setErrors((prev) => ({ ...prev, confirmPassword: '' }));
+                        setError(null);
+                        setSuccess(false);
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors ${errors.confirmPassword ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                    {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
+                  </div>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={handlePasswordChange}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:opacity-60 transition-colors font-medium text-sm"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                    Mettre à jour le mot de passe
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-slate-200">
                 <div className="flex flex-wrap gap-3">
                   <motion.button
                     type="submit"
                     disabled={saving}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-60 transition-colors font-medium text-sm shadow-sm"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60 transition-colors font-medium text-sm shadow-sm"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {saving ? 'Enregistrement…' : 'Enregistrer'}
@@ -303,7 +427,7 @@ export default function AdminEditMyProfile() {
                   <button
                     type="button"
                     onClick={() => navigate('/admin/players')}
-                    className="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                    className="px-6 py-2.5 rounded-xl border-2 border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
                   >
                     Annuler
                   </button>
@@ -311,7 +435,7 @@ export default function AdminEditMyProfile() {
                 <button
                   type="button"
                   onClick={() => navigate('/admin/players')}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-medium text-sm hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all shadow-sm ml-auto sm:ml-0"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-700 font-medium text-sm hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all shadow-sm ml-auto sm:ml-0"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />
                   Retour à la liste

@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +37,7 @@ public class EducatorLogicService {
             throw ApiException.badRequest("jeuId est requis");
         }
         Jeu jeu = validateJeuType(request.getJeuId(), TypeJeu.LOGIQUE);
+        EducatorGameEditPolicy.requireDraft(jeu);
         PuzzleLogique puzzle = PuzzleLogique.builder()
                 .jeu(jeu)
                 .enonce(request.getEnonce())
@@ -45,6 +47,7 @@ public class EducatorLogicService {
                 .difficulte(request.getDifficulte())
                 .build();
         puzzle = puzzleLogiqueRepository.save(puzzle);
+        touchGameContent(jeu);
         return toDTO(puzzle, jeu);
     }
 
@@ -55,12 +58,14 @@ public class EducatorLogicService {
         if (puzzle.getJeu() == null || puzzle.getJeu().getTypeJeu() != TypeJeu.LOGIQUE) {
             throw ApiException.badRequest("Ce puzzle n'est pas lié à un jeu de type LOGIQUE");
         }
+        EducatorGameEditPolicy.requireDraft(puzzle.getJeu());
         if (request.getEnonce() != null) puzzle.setEnonce(request.getEnonce());
         if (request.getDonnees() != null) puzzle.setDonnees(request.getDonnees());
         if (request.getBonneReponse() != null) puzzle.setBonneReponse(request.getBonneReponse());
         if (request.getIndice() != null) puzzle.setIndice(request.getIndice());
         if (request.getDifficulte() != null) puzzle.setDifficulte(request.getDifficulte());
         puzzle = puzzleLogiqueRepository.save(puzzle);
+        touchGameContent(puzzle.getJeu());
         return toDTO(puzzle, puzzle.getJeu());
     }
 
@@ -71,7 +76,14 @@ public class EducatorLogicService {
         if (puzzle.getJeu() == null || puzzle.getJeu().getTypeJeu() != TypeJeu.LOGIQUE) {
             throw ApiException.badRequest("Ce puzzle n'est pas lié à un jeu de type LOGIQUE");
         }
+        EducatorGameEditPolicy.requireDraft(puzzle.getJeu());
+        touchGameContent(puzzle.getJeu());
         puzzleLogiqueRepository.delete(puzzle);
+    }
+
+    private void touchGameContent(Jeu jeu) {
+        jeu.setLastContentUpdateAt(LocalDateTime.now());
+        jeuRepository.save(jeu);
     }
 
     private Jeu validateJeuType(Long jeuId, TypeJeu expected) {

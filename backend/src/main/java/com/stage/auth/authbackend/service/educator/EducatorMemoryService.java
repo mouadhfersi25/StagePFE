@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +37,7 @@ public class EducatorMemoryService {
             throw ApiException.badRequest("jeuId est requis");
         }
         Jeu jeu = validateJeuType(request.getJeuId(), TypeJeu.MEMOIRE);
+        EducatorGameEditPolicy.requireDraft(jeu);
         CarteMemoire carte = CarteMemoire.builder()
                 .jeu(jeu)
                 .symbole(request.getSymbole())
@@ -43,6 +45,7 @@ public class EducatorMemoryService {
                 .categorie(request.getCategorie())
                 .build();
         carte = carteMemoireRepository.save(carte);
+        touchGameContent(jeu);
         return toDTO(carte, jeu);
     }
 
@@ -53,10 +56,12 @@ public class EducatorMemoryService {
         if (carte.getJeu() == null || carte.getJeu().getTypeJeu() != TypeJeu.MEMOIRE) {
             throw ApiException.badRequest("Cette carte n'est pas liée à un jeu de type MEMOIRE");
         }
+        EducatorGameEditPolicy.requireDraft(carte.getJeu());
         if (request.getSymbole() != null) carte.setSymbole(request.getSymbole());
         if (request.getPairKey() != null) carte.setPairKey(request.getPairKey());
         if (request.getCategorie() != null) carte.setCategorie(request.getCategorie());
         carte = carteMemoireRepository.save(carte);
+        touchGameContent(carte.getJeu());
         return toDTO(carte, carte.getJeu());
     }
 
@@ -67,7 +72,14 @@ public class EducatorMemoryService {
         if (carte.getJeu() == null || carte.getJeu().getTypeJeu() != TypeJeu.MEMOIRE) {
             throw ApiException.badRequest("Cette carte n'est pas liée à un jeu de type MEMOIRE");
         }
+        EducatorGameEditPolicy.requireDraft(carte.getJeu());
+        touchGameContent(carte.getJeu());
         carteMemoireRepository.delete(carte);
+    }
+
+    private void touchGameContent(Jeu jeu) {
+        jeu.setLastContentUpdateAt(LocalDateTime.now());
+        jeuRepository.save(jeu);
     }
 
     private Jeu validateJeuType(Long jeuId, TypeJeu expected) {

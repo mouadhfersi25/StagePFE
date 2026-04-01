@@ -6,6 +6,7 @@ import com.stage.auth.authbackend.dto.game.UpdateGameRequest;
 import com.stage.auth.authbackend.service.educator.EducatorGameService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,14 +39,20 @@ public class EducatorGameController {
     }
 
     @PostMapping
-    public ResponseEntity<GameDTO> createGame(@Valid @RequestBody CreateGameRequest request) {
-        GameDTO game = educatorGameService.createGame(request);
+    public ResponseEntity<GameDTO> createGame(@Valid @RequestBody CreateGameRequest request, Authentication authentication) {
+        String educatorEmail = authentication != null ? authentication.getName() : null;
+        GameDTO game = educatorGameService.createGame(request, educatorEmail);
         return ResponseEntity.status(HttpStatus.CREATED).body(game);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<GameDTO> updateGame(@PathVariable Long id, @Valid @RequestBody UpdateGameRequest request) {
         return ResponseEntity.ok(educatorGameService.updateGame(id, request));
+    }
+
+    @PatchMapping("/{id}/submit")
+    public ResponseEntity<GameDTO> submitGame(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorGameService.submitGame(id));
     }
 
     @DeleteMapping("/{id}")

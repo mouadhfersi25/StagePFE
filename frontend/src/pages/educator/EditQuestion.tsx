@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { QuizQuestionDTO, GameDTO, UpdateQuizQuestionRequest } from '@/api/types/api.types';
 
@@ -44,9 +45,21 @@ export default function EditQuestion() {
     let cancelled = false;
     educatorApi
       .getQuestionById(questionId)
-      .then((res) => {
+      .then(async (res) => {
         if (cancelled) return;
         const q = res.data as QuizQuestionDTO;
+        try {
+          const gRes = await educatorApi.getGameById(q.jeuId);
+          if (gRes.data && gRes.data.etat !== 'BROUILLON' && gRes.data.etat !== 'REFUSE') {
+            toast.info('Ce jeu est en attente ou déjà accepté : modification impossible.');
+            navigate('/educator/games/manage', { replace: true });
+            return;
+          }
+        } catch {
+          toast.error('Impossible de vérifier le jeu.');
+          navigate('/educator/games/manage', { replace: true });
+          return;
+        }
         setQuestion(q);
         const raw = q.options && q.options.length > 0 ? [...q.options] : [];
         const opts: string[] = [];
@@ -108,7 +121,7 @@ export default function EditQuestion() {
       .updateQuestion(questionId, payload)
       .then(() => {
         toast.success('Question mise à jour.');
-        navigate('/educator/questions');
+        navigate(`/educator/games/quiz/${question.jeuId}/questions`);
       })
       .catch((err) => {
         toast.error(err.response?.data?.message || err.message || 'Erreur lors de la mise à jour.');
@@ -123,6 +136,7 @@ export default function EditQuestion() {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
+        <EducatorHeader />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
         </div>
@@ -134,13 +148,14 @@ export default function EditQuestion() {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
+        <EducatorHeader />
         <div className="flex-1 flex items-center justify-center gap-4">
           <p className="text-gray-600">Question introuvable.</p>
           <button
-            onClick={() => navigate('/educator/questions')}
+            onClick={() => navigate('/educator/games/manage')}
             className="text-green-600 hover:underline font-medium"
           >
-            Retour aux questions
+            Retour aux jeux
           </button>
         </div>
       </div>
@@ -150,16 +165,17 @@ export default function EditQuestion() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto pt-16">
         <div className="p-8">
           <div className="mb-6">
             <button
-              onClick={() => navigate('/educator/questions')}
+              onClick={() => navigate(`/educator/games/quiz/${question.jeuId}/questions`)}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-4 h-4" />
-              Retour aux questions
+              Retour au quiz
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Modifier la question</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -266,7 +282,7 @@ export default function EditQuestion() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="button"
-                  onClick={() => navigate('/educator/questions')}
+                  onClick={() => navigate(`/educator/games/quiz/${question.jeuId}/questions`)}
                   disabled={submitting}
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-60"
                 >

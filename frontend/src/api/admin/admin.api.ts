@@ -5,8 +5,10 @@ import type {
   CreateBadgeRequest,
   UpdateBadgeRequest,
   EtatJeu,
+  ChangeGameStatusRequest,
   QuizQuestionDTO,
   MemoryCardDTO,
+  GameAiReviewDTO,
 } from "../types/api.types";
 
 const adminApi = {
@@ -19,11 +21,17 @@ const adminApi = {
     api.put(ADMIN_ENDPOINTS.USER_ROLE(id), { role: String(role) }),
   getGames: () => api.get(ADMIN_ENDPOINTS.GAMES),
   getGameById: (id: number | string) => api.get(ADMIN_ENDPOINTS.GAME_BY_ID(id)),
+  getGameAiReview: (id: number | string) => api.get<GameAiReviewDTO>(ADMIN_ENDPOINTS.GAME_AI_REVIEW(id)),
   createGame: (data: Record<string, unknown>) => api.post(ADMIN_ENDPOINTS.GAMES, data),
   updateGame: (id: number | string, data: Record<string, unknown>) =>
     api.put(ADMIN_ENDPOINTS.GAME_BY_ID(id), data),
-  updateGameStatus: (id: number | string, etat: EtatJeu) =>
-    api.patch(ADMIN_ENDPOINTS.GAME_STATUS(id), null, { params: { etat } }),
+  updateGameStatus: (id: number | string, etat: EtatJeu, motifRefus?: string) => {
+    const payload: ChangeGameStatusRequest = {
+      etat,
+      ...(motifRefus ? { motifRefus } : {}),
+    };
+    return api.patch(ADMIN_ENDPOINTS.GAME_STATUS(id), payload);
+  },
   getGameQuestions: (id: number | string) => api.get<QuizQuestionDTO[]>(ADMIN_ENDPOINTS.GAME_QUESTIONS(id)),
   getGameMemoryCards: (id: number | string) => api.get<MemoryCardDTO[]>(ADMIN_ENDPOINTS.GAME_MEMORY_CARDS(id)),
   deleteGame: (id: number | string) => api.delete(ADMIN_ENDPOINTS.GAME_BY_ID(id)),

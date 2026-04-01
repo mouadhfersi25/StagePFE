@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router';
 import { ArrowLeft, Play, Clock, Users, User as UserIcon, Filter, LogIn } from 'lucide-react';
-import { useAdminData, useAuth } from '@/context';
+import { useAuth } from '@/context';
 import { createRoom, joinRoom, getRoom } from '@/services/roomService';
 import type { Game } from '@/data/types';
+import userApi from '@/api/user/user.api';
+import type { GameDTO } from '@/api/types';
 
 export default function NewGame() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { games } = useAdminData();
   const { playerProfile } = useAuth();
   const modeFromState = (location.state as { mode?: 'Individual' | 'Collective' } | null)?.mode;
 
@@ -19,10 +20,51 @@ export default function NewGame() {
   const [selectedMode, setSelectedMode] = useState<'Individual' | 'Collective'>(modeFromState ?? 'Individual');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [games, setGames] = useState<Game[]>([]);
+
+  const mapType = (typeJeu: GameDTO['typeJeu']): Game['type'] => {
+    if (typeJeu === 'QUIZ') return 'quiz';
+    if (typeJeu === 'MEMOIRE') return 'memory';
+    if (typeJeu === 'LOGIQUE') return 'logic';
+    return 'reflex';
+  };
+
+  const mapDifficulty = (difficulte: number | null | undefined): Game['difficulty'] => {
+    const d = difficulte ?? 5;
+    if (d <= 3) return 'Easy';
+    if (d <= 6) return 'Medium';
+    return 'Hard';
+  };
+
+  const toPlayerGame = (g: GameDTO): Game => ({
+    id: String(g.id),
+    title: g.titre,
+    description: g.description || '',
+    type: mapType(g.typeJeu),
+    ageRange: `${g.ageMin ?? 7}-${g.ageMax ?? 18}`,
+    difficulty: mapDifficulty(g.difficulte),
+    estimatedTime: `${g.dureeMinutes ?? 10} min`,
+    icon: g.icone || (g.typeJeu === 'QUIZ' ? '🧮' : g.typeJeu === 'MEMOIRE' ? '🧠' : g.typeJeu === 'LOGIQUE' ? '🎯' : '⚡'),
+    active: g.actif,
+  });
 
   useEffect(() => {
     if (modeFromState) setSelectedMode(modeFromState);
   }, [modeFromState]);
+
+  useEffect(() => {
+    let cancelled = false;
+    userApi.getAvailableGames()
+      .then((res) => {
+        if (cancelled) return;
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setGames(rows.map(toPlayerGame));
+      })
+      .catch(() => {
+        if (!cancelled) setGames([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const currentPlayer = playerProfile
     ? { id: playerProfile.id, name: playerProfile.name, avatar: '👦', age: playerProfile.age }

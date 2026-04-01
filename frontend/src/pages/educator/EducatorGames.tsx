@@ -3,8 +3,9 @@ import { motion } from 'motion/react';
 import { Gamepad2, HelpCircle, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
-import type { GameDTO } from '@/api/types/api.types';
+import type { GameDTO, EtatJeu } from '@/api/types/api.types';
 
 type DisplayGame = {
   id: number;
@@ -14,6 +15,7 @@ type DisplayGame = {
   difficulty: string;
   ageRange: string;
   icon: string;
+  etat: EtatJeu;
 };
 
 function mapGameDTO(dto: GameDTO): DisplayGame | null {
@@ -31,6 +33,7 @@ function mapGameDTO(dto: GameDTO): DisplayGame | null {
     difficulty,
     ageRange,
     icon: dto.icone ?? '🎮',
+    etat: dto.etat,
   };
 }
 
@@ -115,8 +118,9 @@ export default function EducatorGames() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto pt-16">
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">My Games</h1>
@@ -183,10 +187,14 @@ export default function EducatorGames() {
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={() => navigate(`/educator/games/quiz/${game.id}/questions`)}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:shadow-md transition-shadow"
+                              className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:shadow-md transition-shadow ${
+                                game.etat === 'BROUILLON'
+                                  ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-200'
+                              }`}
                             >
                               <Gamepad2 className="w-4 h-4" />
-                              Manage Questions
+                              {game.etat === 'BROUILLON' ? 'Gérer les questions' : 'Voir les questions (lecture seule)'}
                             </motion.button>
                           </div>
                         </motion.div>
@@ -242,10 +250,14 @@ export default function EducatorGames() {
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={() => navigate(`/educator/games/memory/${game.id}/configure`)}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:shadow-md transition-shadow"
+                              className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:shadow-md transition-shadow ${
+                                game.etat === 'BROUILLON'
+                                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-200'
+                              }`}
                             >
                               <Layers className="w-4 h-4" />
-                              Configure pairs
+                              {game.etat === 'BROUILLON' ? 'Configurer les paires' : 'Voir les paires (lecture seule)'}
                             </motion.button>
                           </div>
                         </motion.div>

@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
+import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO, MemoryCardDTO } from '@/api/types/api.types';
 
@@ -113,7 +114,10 @@ export default function ConfigureMemoryGame() {
     return () => { cancelled = true; };
   }, [id]);
 
+  const canEdit = game?.etat === 'BROUILLON' || game?.etat === 'REFUSE';
+
   const addPair = () => {
+    if (!canEdit) return;
     setPairs((prev) => [
       ...prev,
       {
@@ -126,6 +130,7 @@ export default function ConfigureMemoryGame() {
   };
 
   const updatePair = (index: number, side: 1 | 2, value: string) => {
+    if (!canEdit) return;
     setPairs((prev) => {
       const next = [...prev];
       const p = { ...next[index] };
@@ -137,6 +142,7 @@ export default function ConfigureMemoryGame() {
   };
 
   const updatePairField = (index: number, field: 'pairKey' | 'categorie', value: string) => {
+    if (!canEdit) return;
     setPairs((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -145,6 +151,7 @@ export default function ConfigureMemoryGame() {
   };
 
   const removePair = async (index: number) => {
+    if (!canEdit) return;
     const row = pairs[index];
     if (row.card1.id != null) {
       try { await educatorApi.deleteMemoryCard(row.card1.id); } catch (_) {}
@@ -164,7 +171,7 @@ export default function ConfigureMemoryGame() {
   };
 
   const savePair = async (index: number) => {
-    if (!game) return;
+    if (!game || !canEdit) return;
     const row = pairs[index];
     const s1 = (row.card1.symbole ?? '').trim();
     const s2 = (row.card2.symbole ?? '').trim();
@@ -196,7 +203,7 @@ export default function ConfigureMemoryGame() {
   };
 
   const selectIcon = (icon: string) => {
-    if (pickerFor == null) return;
+    if (!canEdit || pickerFor == null) return;
     updatePair(pickerFor.index, pickerFor.side, icon);
     setPickerFor(null);
   };
@@ -205,6 +212,7 @@ export default function ConfigureMemoryGame() {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
+        <EducatorHeader />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-gray-600">Chargement…</p>
         </div>
@@ -216,9 +224,10 @@ export default function ConfigureMemoryGame() {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <EducatorSidebar />
+        <EducatorHeader />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-gray-600">{error ?? 'Jeu introuvable.'}</p>
-          <button onClick={() => navigate('/educator/games')} className="ml-4 text-green-600 hover:underline">
+          <button onClick={() => navigate('/educator/games/manage')} className="ml-4 text-green-600 hover:underline">
             Retour aux jeux
           </button>
         </div>
@@ -229,50 +238,65 @@ export default function ConfigureMemoryGame() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <EducatorSidebar />
+      <EducatorHeader />
 
-      <div className="flex-1 overflow-auto">
-        <div className="p-8 max-w-2xl">
+      <div className="flex-1 overflow-auto pt-16">
+        <div className="p-6 md:p-8 max-w-4xl">
           <button
-            onClick={() => navigate('/educator/games')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+            onClick={() => navigate('/educator/games/manage')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 mb-5 shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             Retour aux jeux
           </button>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{game.titre} — Paires (icônes)</h1>
-          <p className="text-sm text-gray-500 mb-6">
-            Cliquez sur chaque case pour choisir une icône (emoji). Un « ? » signifie qu’il faut choisir une icône. Le joueur verra uniquement des icônes dans le jeu.
-          </p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{game.titre} — Paires (icônes)</h1>
+            <p className="text-sm text-gray-500">
+              {canEdit
+                ? 'Cliquez sur chaque case pour choisir une icône (emoji). Un « ? » signifie qu’il faut choisir une icône.'
+                : 'Lecture seule : ce jeu est finalisé, vous ne pouvez plus modifier les paires.'}
+            </p>
+          </div>
 
-          <div className="flex items-center gap-3 mb-6">
+          {!canEdit && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+              Ce jeu a été finalisé. La modification des paires est désactivée.
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <p className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">{pairs.length}</span> paire{pairs.length > 1 ? 's' : ''}
+            </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={addPair}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+              disabled={saving || !canEdit}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 disabled:opacity-50 shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Ajouter une paire
             </motion.button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {pairs.map((row, index) => (
               <div
                 key={row.pairKey + index}
-                className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-xl border border-gray-200"
+                className="flex flex-wrap items-end gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm"
               >
                 {/* Symbole 1 (carte 1) */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Symbole 1</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Symbole 1</label>
                 <div className="relative">
                   <button
                     type="button"
+                    disabled={!canEdit}
                     onClick={() => setPickerFor(pickerFor?.index === index && pickerFor?.side === 1 ? null : { index, side: 1 })}
-                    className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-3xl bg-gray-50 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                    className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-3xl bg-gray-50 hover:border-purple-400 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                     title="Choisir une icône"
                   >
                     {displayIcon(row.card1.symbole)}
@@ -295,15 +319,16 @@ export default function ConfigureMemoryGame() {
                   )}
                 </div>
                 </div>
-                <span className="text-gray-400 text-xl self-end pb-2">↔</span>
+                <span className="text-gray-400 text-xl self-end pb-3">↔</span>
                 {/* Symbole 2 (carte 2) */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Symbole 2</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Symbole 2</label>
                 <div className="relative">
                   <button
                     type="button"
+                    disabled={!canEdit}
                     onClick={() => setPickerFor(pickerFor?.index === index && pickerFor?.side === 2 ? null : { index, side: 2 })}
-                    className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-3xl bg-gray-50 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                    className="w-14 h-14 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-3xl bg-gray-50 hover:border-purple-400 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                     title="Choisir une icône"
                   >
                     {displayIcon(row.card2.symbole)}
@@ -328,11 +353,12 @@ export default function ConfigureMemoryGame() {
                 </div>
                 {/* Catégorie (optionnel) — liste déroulante selon icônes / existantes */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Catégorie</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Catégorie</label>
                   <select
                     value={row.categorie}
+                    disabled={!canEdit}
                     onChange={(e) => updatePairField(index, 'categorie', e.target.value)}
-                    className="w-36 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    className="w-40 px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white disabled:opacity-50"
                   >
                     <option value="">— Optionnel —</option>
                     {categoryOptions.map((opt) => (
@@ -345,16 +371,16 @@ export default function ConfigureMemoryGame() {
                 <button
                   type="button"
                   onClick={() => savePair(index)}
-                  disabled={saving}
-                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  disabled={saving || !canEdit}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 shadow-sm"
                 >
                   Enregistrer
                 </button>
                 <button
                   type="button"
                   onClick={() => removePair(index)}
-                  disabled={saving}
-                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                  disabled={saving || !canEdit}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-50"
                   title="Supprimer"
                 >
                   <Trash2 className="w-4 h-4" />

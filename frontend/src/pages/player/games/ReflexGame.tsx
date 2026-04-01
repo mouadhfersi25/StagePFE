@@ -2,10 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Target, Zap } from 'lucide-react';
+import userApi from '@/api/user/user.api';
+import type { ReflexSettingsDTO } from '@/api/types';
 
 interface Reaction {
   time: number;
   success: boolean;
+}
+
+interface ChoiceTarget {
+  id: string;
+  x: number;
+  y: number;
+  isCorrect: boolean;
 }
 
 export default function ReflexGame() {
@@ -20,9 +29,29 @@ export default function ReflexGame() {
   const [targetPosition, setTargetPosition] = useState({ x: 50, y: 50 });
   const [startTime, setStartTime] = useState<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [settings, setSettings] = useState<ReflexSettingsDTO | null>(null);
+  const [targetVariant, setTargetVariant] = useState<'icon' | 'color'>('icon');
+  const [activeIsTrap, setActiveIsTrap] = useState(false);
+  const [choiceTargets, setChoiceTargets] = useState<ChoiceTarget[]>([]);
 
-  const totalRounds = 10;
+  const totalRounds = settings?.nombreRounds ?? 10;
+  const maxReactionMs = settings?.tempsReactionMaxMs ?? 2000;
+  const gameplayDifficulty = Math.max(0, Math.min(10, settings?.difficulte ?? 5));
+  const reflexModel = (settings?.modeleReflexe ?? 'CLASSIC').toUpperCase();
   const isGameComplete = round >= totalRounds;
+
+  useEffect(() => {
+    if (!gameId) return;
+    let cancelled = false;
+    userApi.getReflexSettingsByGame(gameId)
+      .then((res) => {
+        if (!cancelled) setSettings(res.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setSettings(null);
+      });
+    return () => { cancelled = true; };
+  }, [gameId]);
 
   useEffect(() => {
     return () => {
@@ -60,32 +89,68 @@ export default function ReflexGame() {
     }
   }, [isGameComplete, reactions]);
 
+  const finalizeRound = (success: boolean, time: number, state: 'ready' | 'missed' | 'toosoon' = 'ready') => {
+    setReactions((prev) => [...prev, { time, success }]);
+    setRound((prev) => prev + 1);
+    setGameState(state);
+    setTimeout(() => {
+      setRound((currentRound) => {
+        if (currentRound < totalRounds) {
+          setGameState('ready');
+        }
+        return currentRound;
+      });
+    }, state === 'ready' ? 500 : 1000);
+  };
+
   const startRound = () => {
     setGameState('waiting');
-    
-    const delay = Math.random() * 3000 + 1000; // 1-4 seconds
+
+    const minDelay = Math.max(400, 1200 - gameplayDifficulty * 70);
+    const maxDelay = Math.max(minDelay + 200, 3200 - gameplayDifficulty * 140);
+    const delay = Math.random() * (maxDelay - minDelay) + minDelay;
     
     timeoutRef.current = setTimeout(() => {
+      let isTrapRound = false;
       setTargetPosition({
         x: Math.random() * 70 + 15,
         y: Math.random() * 70 + 15,
       });
+      if (settings?.typeStimuli === 'COLOR_FLASH') setTargetVariant('color');
+      else if (settings?.typeStimuli === 'MIXED') setTargetVariant(Math.random() > 0.5 ? 'icon' : 'color');
+      else setTargetVariant('icon');
+      if (reflexModel === 'GO_NO_GO') {
+        const ratio = Math.max(10, Math.min(90, settings?.noGoRatio ?? 30));
+        isTrapRound = Math.random() * 100 < ratio;
+        setActiveIsTrap(isTrapRound);
+      } else {
+        setActiveIsTrap(false);
+      }
+      if (reflexModel === 'CHOICE_REACTION') {
+        const count = Math.max(2, Math.min(6, settings?.choiceTargetCount ?? 3));
+        const correctIndex = Math.floor(Math.random() * count);
+        const nextTargets: ChoiceTarget[] = Array.from({ length: count }).map((_, i) => ({
+          id: `choice-${Date.now()}-${i}`,
+          x: Math.random() * 70 + 15,
+          y: Math.random() * 70 + 15,
+          isCorrect: i === correctIndex,
+        }));
+        setChoiceTargets(nextTargets);
+      } else {
+        setChoiceTargets([]);
+      }
       setStartTime(Date.now());
       setGameState('active');
       
-      // Auto-miss after 2 seconds
+      // Auto-miss after configured reaction window
       timeoutRef.current = setTimeout(() => {
-        if (gameState === 'active') {
-          setGameState('missed');
-          setReactions([...reactions, { time: 2000, success: false }]);
-          setRound(round + 1);
-          setTimeout(() => {
-            if (round + 1 < totalRounds) {
-              setGameState('ready');
-            }
-          }, 1000);
+        // In GO_NO_GO, not clicking a trap is a success.
+        if (reflexModel === 'GO_NO_GO' && isTrapRound) {
+          finalizeRound(true, maxReactionMs, 'ready');
+          return;
         }
-      }, 2000);
+        finalizeRound(false, maxReactionMs, 'missed');
+      }, maxReactionMs);
     }, delay);
   };
 
@@ -94,20 +159,21 @@ export default function ReflexGame() {
       startRound();
     } else if (gameState === 'waiting') {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      setGameState('toosoon');
-      setReactions([...reactions, { time: 0, success: false }]);
-      setRound(round + 1);
-      setTimeout(() => {
-        if (round + 1 < totalRounds) {
-          setGameState('ready');
-        }
-      }, 1000);
+      finalizeRound(false, 0, 'toosoon');
     } else if (gameState === 'active') {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const reactionTime = Date.now() - startTime;
-      setReactions([...reactions, { time: reactionTime, success: true }]);
-      setRound(round + 1);
-      setGameState('ready');
+      // Clicking background in choice mode is always wrong.
+      if (reflexModel === 'CHOICE_REACTION') {
+        finalizeRound(false, reactionTime, 'missed');
+        return;
+      }
+      // In GO_NO_GO, clicking trap is wrong.
+      if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
+        finalizeRound(false, reactionTime, 'missed');
+        return;
+      }
+      finalizeRound(true, reactionTime, 'ready');
     }
   };
 
@@ -116,14 +182,20 @@ export default function ReflexGame() {
     if (gameState === 'active') {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const reactionTime = Date.now() - startTime;
-      setReactions([...reactions, { time: reactionTime, success: true }]);
-      setRound(round + 1);
-      setTimeout(() => {
-        if (round + 1 < totalRounds) {
-          setGameState('ready');
-        }
-      }, 500);
+      if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
+        finalizeRound(false, reactionTime, 'missed');
+        return;
+      }
+      finalizeRound(true, reactionTime, 'ready');
     }
+  };
+
+  const handleChoiceTargetClick = (e: React.MouseEvent, target: ChoiceTarget) => {
+    e.stopPropagation();
+    if (gameState !== 'active') return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    const reactionTime = Date.now() - startTime;
+    finalizeRound(target.isCorrect, reactionTime, target.isCorrect ? 'ready' : 'missed');
   };
 
   const avgReactionTime = reactions.filter((r) => r.success).length > 0
@@ -137,6 +209,12 @@ export default function ReflexGame() {
       case 'waiting':
         return { text: 'Wait for the target...', color: 'text-yellow-600', bg: 'bg-yellow-50' };
       case 'active':
+        if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
+          return { text: 'No-Go: do not click!', color: 'text-red-600', bg: 'bg-red-50' };
+        }
+        if (reflexModel === 'CHOICE_REACTION') {
+          return { text: 'Click the correct target!', color: 'text-green-600', bg: 'bg-green-50' };
+        }
         return { text: 'Click the target NOW!', color: 'text-green-600', bg: 'bg-green-50' };
       case 'toosoon':
         return { text: 'Too soon! Wait for the target', color: 'text-red-600', bg: 'bg-red-50' };
@@ -229,7 +307,7 @@ export default function ReflexGame() {
 
           {/* Target */}
           <AnimatePresence>
-            {gameState === 'active' && (
+            {gameState === 'active' && reflexModel !== 'CHOICE_REACTION' && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -245,12 +323,43 @@ export default function ReflexGame() {
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 0.5, repeat: Infinity }}
-                  className="w-24 h-24 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-white"
+                  className={`w-24 h-24 ${
+                    targetVariant === 'color'
+                      ? 'bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl'
+                      : 'bg-gradient-to-br from-red-500 to-pink-500 rounded-full'
+                  } flex items-center justify-center shadow-2xl border-4 border-white`}
                 >
-                  <Target className="w-12 h-12 text-white" />
+                  {targetVariant === 'color' ? (
+                    <span className="text-white font-bold text-xl">GO</span>
+                  ) : (
+                    <Target className="w-12 h-12 text-white" />
+                  )}
                 </motion.div>
               </motion.div>
             )}
+            {gameState === 'active' && reflexModel === 'CHOICE_REACTION' && choiceTargets.map((target) => (
+              <motion.div
+                key={target.id}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                onClick={(e) => handleChoiceTargetClick(e, target)}
+                style={{ position: 'absolute', left: `${target.x}%`, top: `${target.y}%` }}
+                className="transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.12, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl border-4 border-white ${
+                    target.isCorrect
+                      ? 'bg-gradient-to-br from-emerald-500 to-green-600'
+                      : 'bg-gradient-to-br from-slate-400 to-slate-500'
+                  }`}
+                >
+                  <Target className="w-8 h-8 text-white" />
+                </motion.div>
+              </motion.div>
+            ))}
           </AnimatePresence>
         </motion.div>
 
