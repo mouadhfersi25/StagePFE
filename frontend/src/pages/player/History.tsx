@@ -1,13 +1,38 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Target, Users, User } from 'lucide-react';
-import type { Session } from '@/data/types';
 import { format } from 'date-fns';
-
-const sessions: Session[] = [];
+import userApi from '@/api/user/user.api';
+import type { PlayerHistorySessionDTO } from '@/api/types/api.types';
+import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
 
 export default function History() {
   const navigate = useNavigate();
+  const [sessions, setSessions] = useState<PlayerHistorySessionDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    userApi.getHistorySessions()
+      .then((res) => {
+        if (!cancelled) setSessions(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSessions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const gamesWon = useMemo(() => sessions.filter((s) => Boolean(s.reussite)).length, [sessions]);
+  const avgScore = useMemo(
+    () => Math.round(sessions.length ? sessions.reduce((sum, s) => sum + (s.scoreFinal ?? 0), 0) / sessions.length : 0),
+    [sessions]
+  );
 
   const getGameTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -24,44 +49,62 @@ export default function History() {
     }
   };
 
+  const formatDuration = (seconds?: number | null) => {
+    const safe = Math.max(0, seconds ?? 0);
+    const mins = Math.floor(safe / 60);
+    const secs = safe % 60;
+    return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-x-hidden">
+      <div className="pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full bg-fuchsia-600/30 blur-3xl" />
+      <div className="pointer-events-none absolute top-24 -right-20 w-72 h-72 rounded-full bg-cyan-500/30 blur-3xl" />
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="sticky top-0 z-30 bg-slate-950/75 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => navigate('/player/dashboard')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-6 h-6 text-gray-700" />
+              <ArrowLeft className="w-6 h-6 text-white" />
             </motion.button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Session History</h1>
-              <p className="text-sm text-gray-600">View your past games</p>
+              <h1 className="text-2xl font-bold text-white">Session History</h1>
+              <p className="text-sm text-slate-300">View your past games</p>
             </div>
           </div>
+          <PlayerHeaderActions />
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl p-6 mb-8 border border-white/20 text-white bg-gradient-to-r from-violet-700/90 via-fuchsia-700/90 to-cyan-700/90"
+        >
+          <h2 className="text-2xl font-extrabold mb-1">Historique intelligent</h2>
+          <p className="text-white/85 text-sm">Suivi de toutes tes sessions avec métriques détaillées.</p>
+        </motion.div>
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
+            className="bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
-              <p className="text-sm text-gray-600">Games Won</p>
+              <p className="text-sm text-slate-300">Games Won</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900">
-              {sessions.filter((s) => s.reussite).length}
+            <p className="text-3xl font-bold text-white">
+              {gamesWon}
             </p>
           </motion.div>
 
@@ -69,33 +112,31 @@ export default function History() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
+            className="bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
                 <Target className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="text-sm text-gray-600">Total Games</p>
+              <p className="text-sm text-slate-300">Total Games</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{sessions.length}</p>
+            <p className="text-3xl font-bold text-white">{sessions.length}</p>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
+            className="bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
                 <Clock className="w-5 h-5 text-purple-600" />
               </div>
-              <p className="text-sm text-gray-600">Avg Score</p>
+              <p className="text-sm text-slate-300">Avg Score</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900">
-              {Math.round(
-                sessions.length ? sessions.reduce((sum, s) => sum + s.scoreFinal, 0) / sessions.length : 0
-              )}
+            <p className="text-3xl font-bold text-white">
+              {avgScore}
             </p>
           </motion.div>
         </div>
@@ -105,78 +146,78 @@ export default function History() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          className="bg-white/5 rounded-2xl border border-white/15 overflow-hidden backdrop-blur-xl"
         >
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-white/5 border-b border-white/10">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Game
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Duration
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Score
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Mode
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Result
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Accuracy
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-white/10">
                 {sessions.map((session, index) => (
                   <motion.tr
                     key={session.id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 * index }}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-white/10 transition-colors"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{getGameTypeIcon(session.gameType)}</span>
                         <div>
-                          <p className="font-semibold text-gray-900">{session.gameTitle}</p>
-                          <p className="text-sm text-gray-600">{session.gameType}</p>
+                          <p className="font-semibold text-white">{session.gameTitle}</p>
+                          <p className="text-sm text-slate-300">{session.gameType}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">
+                      <p className="text-sm text-slate-100">
                         {format(new Date(session.dateDebut), 'MMM dd, yyyy')}
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-slate-300">
                         {format(new Date(session.dateDebut), 'HH:mm')}
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-1 text-gray-700">
+                      <div className="flex items-center gap-1 text-slate-200">
                         <Clock className="w-4 h-4" />
-                        <span className="text-sm font-medium">{session.duree}</span>
+                        <span className="text-sm font-medium">{formatDuration(session.durationSeconds)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-lg font-bold text-purple-600">{session.scoreFinal}</p>
+                      <p className="text-lg font-bold text-fuchsia-300">{session.scoreFinal}</p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
-                        {session.mode === 'Individual' ? (
-                          <User className="w-4 h-4 text-gray-600" />
+                        {(session.mode || '').toLowerCase() === 'individual' ? (
+                          <User className="w-4 h-4 text-slate-300" />
                         ) : (
-                          <Users className="w-4 h-4 text-gray-600" />
+                          <Users className="w-4 h-4 text-slate-300" />
                         )}
-                        <span className="text-sm text-gray-700">{session.mode}</span>
+                        <span className="text-sm text-slate-200">{session.mode}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -193,10 +234,10 @@ export default function History() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {session.accuracy ? (
+                      {session.accuracy != null ? (
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{session.accuracy}%</p>
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden mt-1">
+                          <p className="text-sm font-semibold text-white">{session.accuracy}%</p>
+                          <div className="w-20 h-2 bg-white/20 rounded-full overflow-hidden mt-1">
                             <div
                               className={`h-full rounded-full ${
                                 session.accuracy >= 80
@@ -210,7 +251,7 @@ export default function History() {
                           </div>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-slate-400">—</span>
                       )}
                     </td>
                   </motion.tr>
@@ -225,11 +266,15 @@ export default function History() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-white rounded-2xl p-12 text-center shadow-lg"
+            className="bg-white/5 rounded-2xl p-12 text-center border border-white/15"
           >
             <span className="text-6xl mb-4 block">📊</span>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No games played yet</h3>
-            <p className="text-gray-600 mb-6">Start playing games to see your history here</p>
+            <h3 className="text-2xl font-bold text-white mb-2">
+              {loading ? 'Chargement de l’historique...' : 'No games played yet'}
+            </h3>
+            <p className="text-slate-300 mb-6">
+              {loading ? 'Veuillez patienter.' : 'Start playing games to see your history here'}
+            </p>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

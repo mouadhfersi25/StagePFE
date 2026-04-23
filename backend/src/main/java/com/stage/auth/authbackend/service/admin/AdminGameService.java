@@ -62,6 +62,7 @@ public class AdminGameService {
         if (request.getModeJeu() != null) jeu.setModeJeu(request.getModeJeu());
         if (request.getDureeMinutes() != null) jeu.setDureeMinutes(request.getDureeMinutes());
         if (request.getIcone() != null) jeu.setIcone(request.getIcone().trim().isEmpty() ? null : request.getIcone().trim());
+        if (request.getCoverImageUrl() != null) jeu.setCoverImageUrl(request.getCoverImageUrl().trim().isEmpty() ? null : request.getCoverImageUrl().trim());
         if (request.getActif() != null) jeu.setActif(request.getActif());
         jeu = jeuRepository.save(jeu);
         return toDTO(jeu);
@@ -146,6 +147,7 @@ public class AdminGameService {
                 .modeJeu(request.getModeJeu())
                 .dureeMinutes(request.getDureeMinutes())
                 .icone(request.getIcone() != null && !request.getIcone().trim().isEmpty() ? request.getIcone().trim() : null)
+                .coverImageUrl(request.getCoverImageUrl() != null && !request.getCoverImageUrl().trim().isEmpty() ? request.getCoverImageUrl().trim() : null)
                 .actif(request.getActif() != null ? request.getActif() : true)
                 .etat(EtatJeu.ACCEPTE)
                 .dateCreation(LocalDateTime.now())
@@ -172,6 +174,7 @@ public class AdminGameService {
                 .actif(jeu.isActif())
                 .dureeMinutes(jeu.getDureeMinutes())
                 .icone(jeu.getIcone())
+                .coverImageUrl(jeu.getCoverImageUrl())
                 .etat(jeu.getEtat())
                 .latestRefusalReason(latestRefusalReason)
                 .dateCreation(jeu.getDateCreation())

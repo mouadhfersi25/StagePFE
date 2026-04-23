@@ -1,7 +1,8 @@
 package com.stage.auth.authbackend.controller.admin;
 
-import com.stage.auth.authbackend.dto.user.UpdateRoleRequest;
-import com.stage.auth.authbackend.dto.user.UserDTO;
+import com.stage.auth.authbackend.dto.admin.AdminScoringDistributionDTO;
+import com.stage.auth.authbackend.dto.player.UpdateRoleRequest;
+import com.stage.auth.authbackend.dto.player.UserDTO;
 import com.stage.auth.authbackend.service.admin.AdminUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -69,5 +71,15 @@ public class AdminUserController {
         String currentEmail = authentication != null ? authentication.getName() : null;
         UserDTO user = adminUserService.updateRole(id, request, currentEmail);
         return ResponseEntity.ok(user);
+    }
+
+    @GetMapping("/sessions/active-count")
+    public ResponseEntity<Map<String, Long>> getActiveSessionsCount() {
+        return ResponseEntity.ok(Map.of("activeSessions", adminUserService.getActiveSessionsCount()));
+    }
+
+    @GetMapping("/scoring-distribution")
+    public ResponseEntity<List<AdminScoringDistributionDTO>> getScoringDistribution() {
+        return ResponseEntity.ok(adminUserService.getScoringDistribution());
     }
 }

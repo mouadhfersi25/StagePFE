@@ -1,5 +1,7 @@
 package com.stage.auth.authbackend.dto.educator;
 
+import com.stage.auth.authbackend.entity.ReflexModel;
+import com.stage.auth.authbackend.entity.ReflexStimulusType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,8 +19,8 @@ public class ReflexSettingsDTO {
 
     private Integer nombreRounds;
     private Integer tempsReactionMaxMs;
-    private String typeStimuli;
-    private String modeleReflexe;
+    private ReflexStimulusType typeStimuli;
+    private ReflexModel modeleReflexe;
     private Integer noGoRatio;
     private Integer choiceTargetCount;
     private Integer difficulte;

@@ -4,7 +4,7 @@ import { Users, Gamepad2, Play, Award, TrendingUp, Clock, Loader2 } from 'lucide
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/context';
 import adminApi from '@/api/admin';
-import type { GameDTO, EtatJeu } from '@/api/types';
+import type { GameDTO, EtatJeu, AdminScoringDistributionDTO } from '@/api/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Check, X, Bell } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,8 +18,10 @@ export default function AdminDashboard() {
   const [totalPlayers, setTotalPlayers] = useState<number>(0);
   const [totalGames, setTotalGames] = useState<number>(0);
   const [totalBadges, setTotalBadges] = useState<number>(0);
+  const [activeSessions, setActiveSessions] = useState<number>(0);
   const [loadingStats, setLoadingStats] = useState(true);
   const [pendingGames, setPendingGames] = useState<GameDTO[]>([]);
+  const [scoringDistribution, setScoringDistribution] = useState<AdminScoringDistributionDTO[]>([]);
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [rejectingGame, setRejectingGame] = useState<GameDTO | null>(null);
 
@@ -42,6 +44,32 @@ export default function AdminDashboard() {
       });
     return () => { cancelled = true; };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .getActiveSessionsCount()
+      .then((res) => {
+        if (!cancelled) setActiveSessions(Number(res.data?.activeSessions || 0));
+      })
+      .catch(() => {
+        if (!cancelled) setActiveSessions(0);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .getScoringDistribution()
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) setScoringDistribution(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setScoringDistribution([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     adminApi
@@ -156,7 +184,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'Active Sessions',
-      value: 0,
+      value: activeSessions,
       icon: <Play className="w-6 h-6" />,
       color: 'from-green-500 to-teal-500',
       change: 'Live',
@@ -178,7 +206,16 @@ export default function AdminDashboard() {
 
   const weeklyData = DAYS.map((day) => ({ day, sessions: 0 }));
   const activityLogs: { id: string; player: string; action: string; game: string; timestamp: string }[] = [];
-  const gameStats: { name: string; plays: number }[] = [];
+  const gameStats: { name: string; plays: number; avgScore: number; avgXp: number }[] = scoringDistribution.map((row) => ({
+    name: row.gameTitle,
+    plays: row.sessions,
+    avgScore: Number(row.avgScore || 0),
+    avgXp: Number(row.avgXp || 0),
+  }));
+  const totalAnomalySessions = scoringDistribution.reduce((acc, row) => acc + Number(row.anomalySessions || 0), 0);
+  const weightedAvgAdjustmentDelta = scoringDistribution.length
+    ? scoringDistribution.reduce((acc, row) => acc + Number(row.avgAdjustmentDelta || 0), 0) / scoringDistribution.length
+    : 0;
 
   return (
     <div className="p-5 md:p-8 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100 min-h-full">
@@ -371,6 +408,14 @@ export default function AdminDashboard() {
             <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
               <p className="text-xs uppercase font-semibold text-amber-700 mb-1">Badges actifs</p>
               <p className="text-2xl font-extrabold text-amber-900">{totalBadges}</p>
+            </div>
+            <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+              <p className="text-xs uppercase font-semibold text-rose-700 mb-1">Sessions anormales</p>
+              <p className="text-2xl font-extrabold text-rose-900">{totalAnomalySessions}</p>
+            </div>
+            <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-4">
+              <p className="text-xs uppercase font-semibold text-sky-700 mb-1">Delta score moyen</p>
+              <p className="text-2xl font-extrabold text-sky-900">{weightedAvgAdjustmentDelta.toFixed(2)}</p>
             </div>
           </div>
         </motion.div>

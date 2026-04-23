@@ -118,6 +118,8 @@ export default function LoginForm() {
         window.location.href = "/educator/dashboard";
       } else if (role === ROLES.PARENT) {
         window.location.href = "/parent/dashboard";
+      } else if (role === ROLES.SPONSOR) {
+        window.location.href = "/sponsor/dashboard";
       } else {
         window.location.href = "/login";
       }

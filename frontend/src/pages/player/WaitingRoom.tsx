@@ -1,21 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router';
 import { ArrowLeft, Users, Check, Clock, Copy, Link2 } from 'lucide-react';
 import { useAuth } from '@/context';
 import { useAdminData } from '@/context';
+import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
 import {
   getRoom,
   joinRoom,
   setPlayerReady,
   setRoomStarted,
+  updateRoomTeamName,
+  subscribeRoom,
   getShareLink,
+  MAX_ROOM_PLAYERS,
   type Room,
   type RoomPlayer,
 } from '@/services/roomService';
 import { toast } from 'sonner';
-
-const POLL_INTERVAL_MS = 2000;
 
 export default function WaitingRoom() {
   const navigate = useNavigate();
@@ -26,9 +28,10 @@ export default function WaitingRoom() {
   const { games } = useAdminData();
 
   const { game: gameFromState, mode, roomCode: roomCodeFromState } = (location.state || {}) as {
-    game?: { id: string; title: string; description: string; icon: string; type: string; estimatedTime: string };
+    game?: { id: string; title: string; description: string; icon: string; type: string; estimatedTime: string; durationMinutes?: number; modeJeu?: 'INDIVIDUEL' | 'COLLECTIF' };
     mode?: string;
     roomCode?: string;
+    teamName?: string;
   };
 
   const roomCodeFromUrl = searchParams.get('room')?.toUpperCase() || roomCodeFromState;
@@ -36,40 +39,66 @@ export default function WaitingRoom() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [teamNameInput, setTeamNameInput] = useState('');
 
-  const currentPlayerId = playerProfile?.id ?? 'guest';
+  const currentPlayerId = String(playerProfile?.id ?? 'guest');
   const currentPlayerName = playerProfile?.name ?? 'Joueur';
   const isHost = room?.players.some((p) => p.id === currentPlayerId && p.isHost) ?? false;
   const myPlayer = room?.players.find((p) => p.id === currentPlayerId);
   const allReady = (room?.players.length && room.players.every((p) => p.ready)) ?? false;
 
-  const refreshRoom = useCallback(() => {
+  const refreshRoom = async () => {
     if (!roomCodeFromUrl) return;
-    const r = getRoom(roomCodeFromUrl);
+    const r = await getRoom(roomCodeFromUrl);
     setRoom(r);
-  }, [roomCodeFromUrl]);
+  };
 
   useEffect(() => {
     if (!roomCodeFromUrl || !gameId) return;
-    const r = getRoom(roomCodeFromUrl);
-    if (!r) {
-      toast.error('Room introuvable');
-      navigate('/player/new-game', { state: { mode: 'Collective' } });
-      return;
-    }
-    joinRoom(roomCodeFromUrl, {
-      id: currentPlayerId,
-      name: currentPlayerName,
-      avatar: '👤',
-      age: playerProfile?.age,
-    });
-    setRoom(getRoom(roomCodeFromUrl));
-  }, [roomCodeFromUrl, gameId, currentPlayerId, currentPlayerName]);
+    let cancelled = false;
+    const bootstrap = async () => {
+      const r = await getRoom(roomCodeFromUrl);
+      if (!r) {
+        toast.error('Room introuvable');
+        navigate('/player/new-game', { state: { mode: 'Collective' } });
+        return;
+      }
+      const joinedRoom = await joinRoom(roomCodeFromUrl, {
+        id: currentPlayerId,
+        name: currentPlayerName,
+        avatar: '👤',
+        age: playerProfile?.age,
+      });
+      if (!joinedRoom) {
+        toast.error(`Room complète (${MAX_ROOM_PLAYERS} joueurs max)`);
+        navigate('/player/new-game', { state: { mode: 'Collective' } });
+        return;
+      }
+      if (!cancelled) setRoom(joinedRoom);
+    };
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomCodeFromUrl, gameId, currentPlayerId, currentPlayerName, navigate, playerProfile?.age]);
 
   useEffect(() => {
-    const id = setInterval(refreshRoom, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [refreshRoom]);
+    if (!game) return;
+    if (game.modeJeu === 'INDIVIDUEL') {
+      toast.error("Ce jeu est en mode solo uniquement");
+      navigate('/player/new-game', { state: { mode: 'Individual' } });
+    }
+  }, [game, navigate]);
+
+  useEffect(() => {
+    if (!roomCodeFromUrl) return;
+    const unsubscribe = subscribeRoom(
+      roomCodeFromUrl,
+      (nextRoom) => setRoom(nextRoom),
+      () => toast.error('Connexion temps réel interrompue')
+    );
+    return () => unsubscribe();
+  }, [roomCodeFromUrl]);
 
   useEffect(() => {
     if (!room?.startedAt) return;
@@ -84,20 +113,48 @@ export default function WaitingRoom() {
 
   useEffect(() => {
     if (countdown !== 0 || !game) return;
-    navigate(`/player/game/${game.type}/${gameId}`, { state: { game, mode } });
-  }, [countdown, game, gameId, mode, navigate]);
+    navigate(`/player/game/${game.type}/${gameId}`, {
+      state: {
+        game,
+        mode,
+        roomCode: roomCodeFromUrl,
+        teamName: room?.teamName,
+      },
+    });
+  }, [countdown, game, gameId, mode, roomCodeFromUrl, room?.teamName, navigate]);
 
-  const handleReady = () => {
+  useEffect(() => {
+    setTeamNameInput(room?.teamName ?? '');
+  }, [room?.teamName]);
+
+  const handleReady = async () => {
     if (!roomCodeFromUrl) return;
-    setPlayerReady(roomCodeFromUrl, currentPlayerId, true);
-    refreshRoom();
+    const updated = await setPlayerReady(roomCodeFromUrl, currentPlayerId, true);
+    if (updated) setRoom(updated);
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!roomCodeFromUrl || !isHost) return;
-    setRoomStarted(roomCodeFromUrl);
+    const result = await setRoomStarted(roomCodeFromUrl, currentPlayerId);
+    if (!result.ok) {
+      if (result.reason === 'NOT_ALL_READY') toast.error("Tous les joueurs doivent être prêts");
+      else if (result.reason === 'HOST_ONLY') toast.error("Seul l'hôte peut démarrer");
+      else toast.error("Room invalide ou expirée");
+      return;
+    }
     setCountdown(3);
-    refreshRoom();
+    await refreshRoom();
+  };
+
+  const handleTeamNameSave = async () => {
+    if (!roomCodeFromUrl || !isHost) return;
+    const result = await updateRoomTeamName(roomCodeFromUrl, currentPlayerId, teamNameInput);
+    if (!result.ok) {
+      toast.error("Nom d'équipe invalide (2-60 caractères)");
+      return;
+    }
+    toast.success("Nom d'équipe mis à jour");
+    await refreshRoom();
   };
 
   const shareLink = roomCodeFromUrl ? getShareLink(gameId!, roomCodeFromUrl) : '';
@@ -113,23 +170,24 @@ export default function WaitingRoom() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="bg-slate-950/75 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => navigate('/player/new-game')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-6 h-6 text-gray-700" />
+              <ArrowLeft className="w-6 h-6 text-white" />
             </motion.button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Salle d’attente</h1>
-              <p className="text-sm text-gray-600">Mode équipe — {game.title}</p>
+              <h1 className="text-2xl font-bold text-white">Salle d’attente</h1>
+              <p className="text-sm text-slate-300">Mode équipe — {game.title}</p>
             </div>
           </div>
+          <PlayerHeaderActions />
         </div>
       </header>
 
@@ -156,11 +214,11 @@ export default function WaitingRoom() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl p-6 shadow-lg mb-6 border-2 border-purple-200"
+            className="bg-white/5 rounded-2xl p-6 mb-6 border border-white/15 backdrop-blur-xl"
           >
             <div className="flex items-center gap-2 mb-2">
               <Link2 className="w-5 h-5 text-purple-600" />
-              <h3 className="font-bold text-gray-900">Code de la room</h3>
+              <h3 className="font-bold text-white">Code de la room</h3>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
               <span className="text-3xl font-mono font-bold tracking-widest text-purple-600 bg-purple-50 px-4 py-2 rounded-xl">
@@ -176,7 +234,7 @@ export default function WaitingRoom() {
                 Copier le lien
               </motion.button>
             </div>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-slate-300 mt-2">
               Envoie ce code ou le lien à tes coéquipiers pour qu’ils rejoignent la room.
             </p>
           </motion.div>
@@ -186,25 +244,47 @@ export default function WaitingRoom() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
+          className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/15 backdrop-blur-xl"
         >
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-400 rounded-2xl flex items-center justify-center text-5xl">
               {game.icon}
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">{game.title}</h2>
-              <p className="text-gray-600">{game.description}</p>
+              <h2 className="text-2xl font-bold text-white mb-1">{game.title}</h2>
+              <p className="text-slate-300">{game.description}</p>
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
+              <div className="flex items-center gap-2 text-slate-300 mb-1">
                 <Clock className="w-4 h-4" />
                 <span className="text-sm">{game.estimatedTime}</span>
               </div>
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-slate-300">
                 <Users className="w-4 h-4" />
-                <span className="text-sm">{room?.players.length ?? 0} joueur(s)</span>
+                <span className="text-sm">{room?.players.length ?? 0} / {MAX_ROOM_PLAYERS} joueur(s)</span>
               </div>
+            </div>
+          </div>
+          <div className="mt-4 border-t border-white/15 pt-4">
+            <p className="text-sm text-slate-300 mb-2">Nom de l'équipe</p>
+            <div className="flex gap-2">
+              <input
+                value={teamNameInput}
+                onChange={(e) => setTeamNameInput(e.target.value)}
+                disabled={!isHost}
+                placeholder="Ex: Les Champions"
+                className="flex-1 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white disabled:opacity-60"
+                maxLength={60}
+              />
+              {isHost ? (
+                <button
+                  type="button"
+                  onClick={handleTeamNameSave}
+                  className="px-4 py-2 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-500"
+                >
+                  Enregistrer
+                </button>
+              ) : null}
             </div>
           </div>
         </motion.div>
@@ -214,12 +294,12 @@ export default function WaitingRoom() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
+          className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/15 backdrop-blur-xl"
         >
           <div className="flex items-center gap-2 mb-6">
-            <Users className="w-5 h-5 text-gray-700" />
-            <h3 className="text-xl font-bold text-gray-900">Joueurs dans la room</h3>
-            <span className="ml-auto text-sm text-gray-600">
+            <Users className="w-5 h-5 text-slate-200" />
+            <h3 className="text-xl font-bold text-white">Joueurs dans la room</h3>
+            <span className="ml-auto text-sm text-slate-300">
               {room?.players.filter((p) => p.ready).length ?? 0} / {room?.players.length ?? 0} prêts
             </span>
           </div>
@@ -232,14 +312,14 @@ export default function WaitingRoom() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.05 * index }}
                 className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-colors ${
-                  member.ready ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+                  member.ready ? 'bg-green-500/15 border-green-300/40' : 'bg-white/5 border-white/20'
                 } ${member.id === currentPlayerId ? 'ring-2 ring-purple-400' : ''}`}
               >
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-blue-400 rounded-xl flex items-center justify-center text-3xl">
                   {member.avatar}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900">
+                  <h4 className="font-bold text-white">
                     {member.name}
                     {member.isHost && (
                       <span className="ml-2 text-xs font-normal text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
@@ -247,10 +327,10 @@ export default function WaitingRoom() {
                       </span>
                     )}
                     {member.id === currentPlayerId && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">(toi)</span>
+                      <span className="ml-2 text-xs font-normal text-slate-300">(toi)</span>
                     )}
                   </h4>
-                  {member.age != null && <p className="text-sm text-gray-600">{member.age} ans</p>}
+                  {member.age != null && <p className="text-sm text-slate-300">{member.age} ans</p>}
                 </div>
                 {member.ready ? (
                   <div className="flex items-center gap-2 text-green-600 font-semibold">
@@ -258,14 +338,14 @@ export default function WaitingRoom() {
                     Prêt
                   </div>
                 ) : (
-                  <div className="text-gray-500 font-semibold">En attente...</div>
+                  <div className="text-slate-300 font-semibold">En attente...</div>
                 )}
               </motion.div>
             ))}
           </div>
 
           {(!room?.players?.length || room.players.length === 0) && (
-            <p className="text-gray-500 text-center py-4">Aucun joueur pour l’instant. Partage le code ou le lien.</p>
+            <p className="text-slate-300 text-center py-4">Aucun joueur pour l’instant. Partage le code ou le lien.</p>
           )}
         </motion.div>
 
@@ -296,7 +376,7 @@ export default function WaitingRoom() {
               Lancer la partie
             </motion.button>
           ) : (
-            <div className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
+            <div className="flex-1 bg-white/10 text-slate-200 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 border border-white/20">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}

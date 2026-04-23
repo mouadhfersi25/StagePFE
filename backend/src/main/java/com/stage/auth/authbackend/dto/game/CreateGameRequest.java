@@ -42,6 +42,8 @@ public class CreateGameRequest {
     @Size(max = 20)
     private String icone;
 
+    private String coverImageUrl;
+
     /** Par défaut true si non fourni. */
     private Boolean actif = true;
 }

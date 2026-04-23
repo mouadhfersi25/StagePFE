@@ -15,6 +15,7 @@ import com.stage.auth.authbackend.repository.game.CarteMemoireRepository;
 import com.stage.auth.authbackend.repository.game.GameReviewHistoryRepository;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
 import com.stage.auth.authbackend.repository.game.ParametresReflexeRepository;
+import com.stage.auth.authbackend.repository.game.PuzzleLogiqueRepository;
 import com.stage.auth.authbackend.repository.game.QuestionRepository;
 import com.stage.auth.authbackend.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class EducatorGameService {
     private final JeuRepository jeuRepository;
     private final QuestionRepository questionRepository;
     private final CarteMemoireRepository carteMemoireRepository;
+    private final PuzzleLogiqueRepository puzzleLogiqueRepository;
     private final ParametresReflexeRepository parametresReflexeRepository;
     private final GameReviewHistoryRepository gameReviewHistoryRepository;
     private final UserRepository userRepository;
@@ -72,6 +74,7 @@ public class EducatorGameService {
                 .modeJeu(request.getModeJeu())
                 .dureeMinutes(request.getDureeMinutes())
                 .icone(request.getIcone() != null && !request.getIcone().trim().isEmpty() ? request.getIcone().trim() : null)
+                .coverImageUrl(request.getCoverImageUrl() != null && !request.getCoverImageUrl().trim().isEmpty() ? request.getCoverImageUrl().trim() : null)
                 .actif(request.getActif() != null ? request.getActif() : true)
                 .etat(EtatJeu.BROUILLON)
                 .dateCreation(LocalDateTime.now())
@@ -94,6 +97,7 @@ public class EducatorGameService {
         if (request.getModeJeu() != null) jeu.setModeJeu(request.getModeJeu());
         if (request.getDureeMinutes() != null) jeu.setDureeMinutes(request.getDureeMinutes());
         if (request.getIcone() != null) jeu.setIcone(request.getIcone().trim().isEmpty() ? null : request.getIcone().trim());
+        if (request.getCoverImageUrl() != null) jeu.setCoverImageUrl(request.getCoverImageUrl().trim().isEmpty() ? null : request.getCoverImageUrl().trim());
         if (request.getActif() != null) jeu.setActif(request.getActif());
 
         jeu = jeuRepository.save(jeu);
@@ -152,6 +156,13 @@ public class EducatorGameService {
             }
             return;
         }
+
+        if (jeu.getTypeJeu() == TypeJeu.LOGIQUE) {
+            if (puzzleLogiqueRepository.findByJeuId(jeu.getId()).isEmpty()) {
+                throw ApiException.badRequest("Ajoutez au moins un puzzle logique avant de finaliser ce jeu");
+            }
+            return;
+        }
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -207,6 +218,7 @@ public class EducatorGameService {
                 .actif(jeu.isActif())
                 .dureeMinutes(jeu.getDureeMinutes())
                 .icone(jeu.getIcone())
+                .coverImageUrl(jeu.getCoverImageUrl())
                 .etat(jeu.getEtat())
                 .latestRefusalReason(latestRefusalReason)
                 .dateCreation(jeu.getDateCreation())

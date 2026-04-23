@@ -38,5 +38,7 @@ public class UpdateGameRequest {
     @Size(max = 20)
     private String icone;
 
+    private String coverImageUrl;
+
     private Boolean actif;
 }

@@ -16,6 +16,9 @@ public class Niveau {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "niveau", unique = true)
+    private Integer niveau;
+
     @Column(name = "point_min")
     private Integer pointMin;
 

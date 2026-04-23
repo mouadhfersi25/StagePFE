@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import BodyClassSync from "./BodyClassSync";
 import Home from "../pages/Home/Home";
 import Register from "../pages/auth/Register/Register";
@@ -11,6 +12,7 @@ import AdminLayout from "../components/admin/AdminLayout";
 import PublicRoute from "./PublicRoute";
 import PrivateRoute from "./PrivateRoute";
 import AdminRoute from "./AdminRoute";
+import SponsorRoute from "./SponsorRoute";
 import AdminDashboard from "../pages/admin/dashboard/AdminDashboard";
 import Players from "../pages/admin/manage-users/Players";
 import PlayerDetail from "../pages/admin/manage-users/PlayerDetail";
@@ -24,20 +26,21 @@ import AddBadge from "../pages/admin/manage-badges/AddBadge";
 import EditBadge from "../pages/admin/manage-badges/EditBadge";
 import Moderation from "../pages/admin/moderation/Moderation";
 import Statistics from "../pages/admin/statistics/Statistics";
-import EducatorDashboard from "../pages/educator/EducatorDashboard";
-import AddQuestion from "../pages/educator/AddQuestion";
-import EditQuestion from "../pages/educator/EditQuestion";
-import EducatorGames from "../pages/educator/EducatorGames";
-import EducatorManageGames from "../pages/educator/manage-games/EducatorManageGames";
-import EducatorAddGame from "../pages/educator/manage-games/EducatorAddGame";
-import EducatorEditGame from "../pages/educator/manage-games/EducatorEditGame";
-import EducatorViewGame from "../pages/educator/manage-games/EducatorViewGame";
-import EducatorGameTypeSection from "../pages/educator/manage-games/EducatorGameTypeSection";
-import GameQuestions from "../pages/educator/GameQuestions";
-import ViewQuestion from "../pages/educator/ViewQuestion";
-import ConfigureMemoryGame from "../pages/educator/ConfigureMemoryGame";
-import ConfigureReflexGame from "../pages/educator/ConfigureReflexGame";
-import EducatorStatistics from "../pages/educator/EducatorStatistics";
+import EducatorDashboard from "../pages/educator/dashboard/EducatorDashboard";
+import AddQuestion from "../pages/educator/questions/AddQuestion";
+import EditQuestion from "../pages/educator/questions/EditQuestion";
+import EducatorGames from "../pages/educator/games/EducatorGames";
+import EducatorManageGames from "../pages/educator/games/manage-games/EducatorManageGames";
+import EducatorAddGame from "../pages/educator/games/manage-games/EducatorAddGame";
+import EducatorEditGame from "../pages/educator/games/manage-games/EducatorEditGame";
+import EducatorViewGame from "../pages/educator/games/manage-games/EducatorViewGame";
+import EducatorGameTypeSection from "../pages/educator/games/manage-games/EducatorGameTypeSection";
+import GameQuestions from "../pages/educator/questions/GameQuestions";
+import ViewQuestion from "../pages/educator/questions/ViewQuestion";
+import ConfigureMemoryGame from "../pages/educator/games/ConfigureMemoryGame";
+import ConfigureReflexGame from "../pages/educator/games/ConfigureReflexGame";
+import ConfigureLogicGame from "../pages/educator/games/ConfigureLogicGame";
+import EducatorStatistics from "../pages/educator/statistics/EducatorStatistics";
 import EducatorManageProfile from "../pages/educator/profile/EducatorManageProfile";
 import PlayerDashboard from "../pages/player/PlayerDashboard";
 import NewGame from "../pages/player/NewGame";
@@ -50,16 +53,29 @@ import GameResult from "../pages/player/GameResult";
 import PlayerProgress from "../pages/player/Progress";
 import PlayerHistory from "../pages/player/History";
 import PlayerBadges from "../pages/player/Badges";
+import PlayerRewards from "../pages/player/Rewards";
 import PlayerProfile from "../pages/player/Profile";
 import PlayerRanking from "../pages/player/Ranking";
 import ParentDashboard from "../pages/parent/ParentDashboard";
 import ChildProgress from "../pages/parent/ChildProgress";
 import ParentAnalytics from "../pages/parent/Analytics";
+import SponsorDashboard from "../pages/sponsor/SponsorDashboard";
+
+function ScrollToTopOnRouteChange() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
+
+  return null;
+}
 
 function AppRoutes() {
   return (
     <BrowserRouter>
       <BodyClassSync />
+      <ScrollToTopOnRouteChange />
       <Routes>
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -95,6 +111,7 @@ function AppRoutes() {
         <Route path="/educator/games/quiz/:gameId/questions" element={<PrivateRoute><GameQuestions /></PrivateRoute>} />
         <Route path="/educator/games/memory/:gameId/configure" element={<PrivateRoute><ConfigureMemoryGame /></PrivateRoute>} />
         <Route path="/educator/games/reflex/:gameId/configure" element={<PrivateRoute><ConfigureReflexGame /></PrivateRoute>} />
+        <Route path="/educator/games/logic/:gameId/configure" element={<PrivateRoute><ConfigureLogicGame /></PrivateRoute>} />
         <Route path="/educator/statistics" element={<PrivateRoute><EducatorStatistics /></PrivateRoute>} />
         <Route path="/educator/profile" element={<PrivateRoute><EducatorManageProfile /></PrivateRoute>} />
         <Route path="/player/dashboard" element={<PrivateRoute><PlayerDashboard /></PrivateRoute>} />
@@ -108,6 +125,7 @@ function AppRoutes() {
         <Route path="/player/progress" element={<PrivateRoute><PlayerProgress /></PrivateRoute>} />
         <Route path="/player/history" element={<PrivateRoute><PlayerHistory /></PrivateRoute>} />
         <Route path="/player/badges" element={<PrivateRoute><PlayerBadges /></PrivateRoute>} />
+        <Route path="/player/rewards" element={<PrivateRoute><PlayerRewards /></PrivateRoute>} />
         <Route path="/player/profile" element={<PrivateRoute><PlayerProfile /></PrivateRoute>} />
         <Route path="/player/ranking" element={<PrivateRoute><PlayerRanking /></PrivateRoute>} />
         <Route path="/parent/dashboard" element={<PrivateRoute><ParentDashboard /></PrivateRoute>} />
@@ -115,6 +133,7 @@ function AppRoutes() {
         <Route path="/parent/analytics" element={<PrivateRoute><ParentAnalytics /></PrivateRoute>} />
         <Route path="/parent/badges" element={<PrivateRoute><PlayerBadges /></PrivateRoute>} />
         <Route path="/parent/history" element={<PrivateRoute><PlayerHistory /></PrivateRoute>} />
+        <Route path="/sponsor/dashboard" element={<SponsorRoute><SponsorDashboard /></SponsorRoute>} />
         <Route path="/" element={<Home />} />
       </Routes>
     </BrowserRouter>

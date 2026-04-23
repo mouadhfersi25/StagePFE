@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class UpdateLogicPuzzleRequest {
 
     private String enonce;
+    private String sousType;
     private String donnees;
     private String bonneReponse;
     private String indice;

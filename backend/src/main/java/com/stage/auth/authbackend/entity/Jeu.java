@@ -50,6 +50,9 @@ public class Jeu {
     @Column(name = "icone", length = 20)
     private String icone;
 
+    @Column(name = "cover_image_url", columnDefinition = "TEXT")
+    private String coverImageUrl;
+
     @Column(name = "date_creation")
     private LocalDateTime dateCreation;
 

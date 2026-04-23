@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
@@ -150,6 +151,7 @@ public class AuthService {
             throw ApiException.unauthorized("Account is not active");
         }
 
+        applyStreakPolicy(user);
         user.setDateDerniereConnexion(LocalDateTime.now());
         userRepository.save(user);
 
@@ -160,6 +162,34 @@ public class AuthService {
                 .role(user.getRole().name())
                 .email(user.getEmail())
                 .build();
+    }
+
+    private void applyStreakPolicy(User user) {
+        if (user.getRole() != Role.JOUEUR) return;
+
+        LocalDate today = LocalDate.now();
+        Integer currentStreak = user.getCurrentStreakDays() != null ? Math.max(0, user.getCurrentStreakDays()) : 0;
+        Integer bestStreak = user.getBestStreakDays() != null ? Math.max(0, user.getBestStreakDays()) : 0;
+        LocalDate lastStreakDate = user.getLastStreakDate();
+
+        if (lastStreakDate == null) {
+            currentStreak = 1;
+            lastStreakDate = today;
+        } else {
+            long daysDelta = ChronoUnit.DAYS.between(lastStreakDate, today);
+            if (daysDelta == 1) {
+                currentStreak += 1;
+                lastStreakDate = today;
+            } else if (daysDelta > 1) {
+                currentStreak = 1;
+                lastStreakDate = today;
+            }
+        }
+
+        bestStreak = Math.max(bestStreak, currentStreak);
+        user.setCurrentStreakDays(currentStreak);
+        user.setBestStreakDays(bestStreak);
+        user.setLastStreakDate(lastStreakDate);
     }
 
     public void forgotPassword(ForgotPasswordRequest request) {

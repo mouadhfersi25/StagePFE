@@ -19,6 +19,7 @@ public class CreateLogicPuzzleRequest {
     @NotBlank
     private String enonce;
 
+    private String sousType;
     private String donnees;
 
     @NotBlank

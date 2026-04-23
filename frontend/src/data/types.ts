@@ -7,7 +7,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'player' | 'parent' | 'admin' | 'educator';
+  role: 'player' | 'parent' | 'admin' | 'educator' | 'sponsor';
   age?: number;
   avatar?: string;
 }
@@ -17,9 +17,29 @@ export interface PlayerProfile {
   name: string;
   age: number;
   avatar?: string;
+  nom?: string;
+  prenom?: string;
+  email?: string;
+  telephone?: string | null;
+  avatarUrl?: string | null;
+  role?: string;
+  etatCompte?: string;
+  enabled?: boolean;
+  dateDeNaissance?: string | null;
   onboardingCompleted?: boolean;
+  idRegion?: number | null;
+  idPays?: number | null;
+  idGenre?: number | null;
   paysNom?: string;
   regionNom?: string;
+  niveau?: number;
+  scoreTotal?: number;
+  pointsExperience?: number;
+  currentStreakDays?: number;
+  bestStreakDays?: number;
+  lastStreakDate?: string | null;
+  dateDerniereConnexion?: string | null;
+  dateCreation?: string | null;
   level: number;
   xp: number;
   xpToNextLevel: number;
@@ -37,10 +57,13 @@ export interface Game {
   title: string;
   description: string;
   type: 'quiz' | 'memory' | 'logic' | 'reflex';
+  modeJeu?: 'INDIVIDUEL' | 'COLLECTIF';
   ageRange: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   estimatedTime: string;
+  durationMinutes?: number;
   icon: string;
+  coverImageUrl?: string;
   active?: boolean;
 }
 

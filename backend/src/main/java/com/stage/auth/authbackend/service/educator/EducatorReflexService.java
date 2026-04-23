@@ -4,6 +4,8 @@ import com.stage.auth.authbackend.dto.educator.CreateOrUpdateReflexSettingsReque
 import com.stage.auth.authbackend.dto.educator.ReflexSettingsDTO;
 import com.stage.auth.authbackend.entity.Jeu;
 import com.stage.auth.authbackend.entity.ParametresReflexe;
+import com.stage.auth.authbackend.entity.ReflexModel;
+import com.stage.auth.authbackend.entity.ReflexStimulusType;
 import com.stage.auth.authbackend.entity.TypeJeu;
 import com.stage.auth.authbackend.exception.ApiException;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
@@ -36,7 +38,8 @@ public class EducatorReflexService {
         if (request.getNombreRounds() == null) {
             throw ApiException.badRequest("nombreRounds est requis");
         }
-        String modeleReflexe = normalizeModel(request.getModeleReflexe());
+        ReflexModel modeleReflexe = request.getModeleReflexe() != null ? request.getModeleReflexe() : ReflexModel.CLASSIC;
+        ReflexStimulusType typeStimuli = request.getTypeStimuli() != null ? request.getTypeStimuli() : ReflexStimulusType.TARGET_ICON;
         int noGoRatio = clamp(request.getNoGoRatio(), 10, 90, 30);
         int choiceTargetCount = clamp(request.getChoiceTargetCount(), 2, 6, 3);
         Jeu jeu = validateJeuType(request.getJeuId(), TypeJeu.REFLEXE);
@@ -47,7 +50,7 @@ public class EducatorReflexService {
                     .jeu(jeu)
                     .nombreRounds(request.getNombreRounds())
                     .tempsReactionMaxMs(request.getTempsReactionMaxMs())
-                    .typeStimuli(request.getTypeStimuli())
+                    .typeStimuli(typeStimuli)
                     .modeleReflexe(modeleReflexe)
                     .noGoRatio(noGoRatio)
                     .choiceTargetCount(choiceTargetCount)
@@ -56,7 +59,7 @@ public class EducatorReflexService {
         } else {
             params.setNombreRounds(request.getNombreRounds());
             if (request.getTempsReactionMaxMs() != null) params.setTempsReactionMaxMs(request.getTempsReactionMaxMs());
-            if (request.getTypeStimuli() != null) params.setTypeStimuli(request.getTypeStimuli());
+            params.setTypeStimuli(typeStimuli);
             params.setModeleReflexe(modeleReflexe);
             params.setNoGoRatio(noGoRatio);
             params.setChoiceTargetCount(choiceTargetCount);
@@ -88,20 +91,12 @@ public class EducatorReflexService {
                 .jeuTitre(jeu.getTitre())
                 .nombreRounds(p.getNombreRounds())
                 .tempsReactionMaxMs(p.getTempsReactionMaxMs())
-                .typeStimuli(p.getTypeStimuli())
-                .modeleReflexe(p.getModeleReflexe())
+                .typeStimuli(p.getTypeStimuli() != null ? p.getTypeStimuli() : ReflexStimulusType.TARGET_ICON)
+                .modeleReflexe(p.getModeleReflexe() != null ? p.getModeleReflexe() : ReflexModel.CLASSIC)
                 .noGoRatio(p.getNoGoRatio())
                 .choiceTargetCount(p.getChoiceTargetCount())
                 .difficulte(p.getDifficulte())
                 .build();
-    }
-
-    private static String normalizeModel(String raw) {
-        String value = raw == null ? "" : raw.trim().toUpperCase();
-        if ("GO_NO_GO".equals(value) || "CHOICE_REACTION".equals(value) || "CLASSIC".equals(value)) {
-            return value;
-        }
-        return "CLASSIC";
     }
 
     private static int clamp(Integer value, int min, int max, int defaultValue) {

@@ -56,6 +56,9 @@ public class User {
     private Integer niveau;
     private Integer scoreTotal;
     private Integer pointsExperience;
+    private Integer currentStreakDays;
+    private Integer bestStreakDays;
+    private LocalDate lastStreakDate;
 
     @ManyToOne
     @JoinColumn(name = "id_region")
@@ -91,10 +94,15 @@ public class User {
             if (this.niveau == null) this.niveau = 1;
             if (this.scoreTotal == null) this.scoreTotal = 0;
             if (this.pointsExperience == null) this.pointsExperience = 0;
+            if (this.currentStreakDays == null) this.currentStreakDays = 0;
+            if (this.bestStreakDays == null) this.bestStreakDays = 0;
         } else {
             this.niveau = null;
             this.scoreTotal = null;
             this.pointsExperience = null;
+            this.currentStreakDays = null;
+            this.bestStreakDays = null;
+            this.lastStreakDate = null;
         }
     }
 }

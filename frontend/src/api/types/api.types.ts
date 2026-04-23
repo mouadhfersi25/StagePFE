@@ -63,6 +63,10 @@ export interface UserDTO {
   niveau: number | null;
   scoreTotal: number | null;
   pointsExperience: number | null;
+  xpToNextLevel?: number | null;
+  currentStreakDays?: number | null;
+  bestStreakDays?: number | null;
+  lastStreakDate?: string | null;
   idRegion: number | null;
   idPays: number | null;
   onboardingCompleted: boolean;
@@ -97,6 +101,246 @@ export interface PlayerOnboardingRequest {
   avatarUrl?: string;
 }
 
+export interface CreateGameSessionRequest {
+  gameId: number;
+  modeJeu?: 'INDIVIDUEL' | 'COLLECTIF' | string;
+  roomCode?: string;
+  teamName?: string;
+  scoreGlobal?: number;
+  niveauAtteint?: number;
+  etatSession?: 'EN_COURS' | 'TERMINE' | 'ABANDONNE' | string;
+  durationSeconds?: number;
+  accuracyPercent?: number;
+  reactionTimeMs?: number;
+  totalQuestions?: number;
+  correctAnswers?: number;
+  moves?: number;
+  matches?: number;
+  attempts?: number;
+  hintsUsed?: number;
+  totalRounds?: number;
+  successfulRounds?: number;
+  reussite?: boolean;
+}
+
+export interface SoloLeaderboardEntryDTO {
+  userId: number;
+  displayName: string;
+  avatarUrl?: string | null;
+  level: number;
+  totalScore: number;
+}
+
+export interface TeamLeaderboardEntryDTO {
+  teamName: string;
+  roomCode: string;
+  sessionsCount: number;
+  playersCount: number;
+  averageScore: number;
+  totalScore: number;
+}
+
+export interface PlayerBadgeOverviewItemDTO {
+  id: number;
+  nom: string;
+  description: string | null;
+  icone: string | null;
+  unlockCondition: string;
+  earned: boolean;
+  claimable: boolean;
+  earnedDate: string | null;
+}
+
+export interface PlayerBadgesOverviewDTO {
+  total: number;
+  earned: number;
+  badges: PlayerBadgeOverviewItemDTO[];
+}
+
+export interface PlayerRewardOverviewItemDTO {
+  id: number;
+  claimId?: number | null;
+  nom: string;
+  description: string | null;
+  typeRecompense: string;
+  scoreMin: number;
+  unlockCondition: string;
+  claimable: boolean;
+  claimed: boolean;
+  requestStatus: string | null;
+  requestedDate: string | null;
+}
+
+export interface PlayerRewardsOverviewDTO {
+  total: number;
+  claimable: number;
+  claimed: number;
+  rewards: PlayerRewardOverviewItemDTO[];
+}
+
+export interface PlayerHistorySessionDTO {
+  id: number;
+  gameId: number | null;
+  gameTitle: string;
+  gameType: string;
+  dateDebut: string;
+  dateFin?: string | null;
+  durationSeconds?: number | null;
+  scoreFinal: number;
+  niveauAtteint?: number | null;
+  reussite: boolean;
+  statut: 'EN_COURS' | 'TERMINEE' | 'ABANDONNEE' | string;
+  mode: 'Individual' | 'Collective' | string;
+  accuracy?: number | null;
+  reactionTime?: number | null;
+}
+
+export interface PlayerProgressPointDTO {
+  week: string;
+  xp: number;
+  score: number;
+}
+
+export interface PlayerGameTypePerformanceDTO {
+  type: string;
+  played: number;
+  avgScore: number;
+  successRate: number;
+}
+
+export interface PlayerProgressOverviewDTO {
+  currentLevel: number;
+  avgSuccessRate: number;
+  totalSessions: number;
+  weeklyPlaytimeMinutes: number;
+  skillMath: number;
+  skillLogic: number;
+  skillMemory: number;
+  skillReflex: number;
+  progressData: PlayerProgressPointDTO[];
+  performanceByGameType: PlayerGameTypePerformanceDTO[];
+}
+
+export interface RealtimeRoomPlayerDTO {
+  id: number;
+  name: string;
+  avatar: string;
+  age?: number | null;
+  ready: boolean;
+  host: boolean;
+}
+
+export interface RealtimeRoomStateDTO {
+  roomCode: string;
+  gameId: number;
+  teamName?: string | null;
+  maxPlayers: number;
+  createdAt: number;
+  startedAt?: number | null;
+  allReady: boolean;
+  players: RealtimeRoomPlayerDTO[];
+}
+
+export interface CreateRoomRequest {
+  gameId: number;
+  teamName?: string;
+}
+
+export interface JoinRoomRequest {
+  roomCode: string;
+}
+
+export interface CreateGameSessionResponse {
+  sessionId: number;
+  scoreGlobal: number;
+  scoreBase?: number;
+  scoreFinal?: number;
+  aiAdjustment?: number;
+  totalScore: number;
+  xpGained: number;
+  previousLevel: number;
+  newLevel: number;
+  previousXp: number;
+  newXp: number;
+  xpToNextLevel: number;
+  durationSeconds?: number;
+  dateDebut?: string;
+  dateFin?: string;
+  levelUp: boolean;
+  scoringRulesVersion?: string;
+  anomalyNotes?: string;
+  adjustmentSource?: string;
+  explanationCode?: string;
+  message: string;
+}
+
+export interface AdminScoringDistributionDTO {
+  gameId: number;
+  gameTitle: string;
+  gameType: 'QUIZ' | 'MEMOIRE' | 'LOGIQUE' | 'REFLEXE' | string;
+  sessions: number;
+  avgScore: number;
+  minScore: number;
+  maxScore: number;
+  avgXp: number;
+  totalXp: number;
+  avgAdjustmentDelta?: number;
+  anomalySessions?: number;
+}
+
+export interface SponsorPubliciteDTO {
+  id: number;
+  contenu: string;
+  status?: string | null;
+  typePublicite?: string | null;
+  imageUrl?: string | null;
+  adDurationSeconds?: number | null;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  budgetUtilise?: number | null;
+  nbVues?: number | null;
+  nbClics?: number | null;
+  sponsorNom?: string | null;
+}
+
+export interface SponsorRecompenseDTO {
+  id: number;
+  nom: string;
+  description?: string | null;
+  scoreMin?: number | null;
+  typeRecompense?: string | null;
+  sponsorNom?: string | null;
+  stockTotal?: number | null;
+  stockRemaining?: number | null;
+  distributedCount?: number | null;
+  valeur?: number | null;
+  devise?: string | null;
+  partenaireNom?: string | null;
+  dateEvenement?: string | null;
+  lieuEvenement?: string | null;
+  modeRemise?: string | null;
+  instructionsRemise?: string | null;
+  imageUrl?: string | null;
+  status?: string | null;
+}
+
+export interface SponsorRewardRequestDTO {
+  id: number;
+  rewardId?: number | null;
+  rewardName?: string | null;
+  rewardScoreMin?: number | null;
+  playerId?: number | null;
+  playerName?: string | null;
+  playerEmail?: string | null;
+  playerScoreTotal?: number | null;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | string | null;
+  requestedDate?: string | null;
+}
+
+export interface CreatePubliciteInteractionRequest {
+  typeInteraction: 'VIEW' | 'CLICK' | string;
+}
+
 // ----- Admin Games (POST /api/admin/games) -----
 
 /** Valeurs possibles pour typeJeu (backend enum TypeJeu) */
@@ -119,6 +363,7 @@ export interface CreateGameRequest {
   modeJeu: ModeJeu;
   dureeMinutes?: number;
   icone?: string;
+  coverImageUrl?: string;
   actif?: boolean;
 }
 
@@ -133,6 +378,7 @@ export interface UpdateGameRequest {
   modeJeu?: ModeJeu;
   dureeMinutes?: number;
   icone?: string;
+  coverImageUrl?: string;
   actif?: boolean;
 }
 
@@ -149,6 +395,7 @@ export interface GameDTO {
   actif: boolean;
   dureeMinutes: number | null;
   icone: string | null;
+  coverImageUrl: string | null;
   etat: EtatJeu;
   latestRefusalReason: string | null;
   dateCreation: string | null;
@@ -257,6 +504,45 @@ export interface UpdateQuizQuestionRequest {
 export interface GenerateQuizPreviewRequest {
   gameId: number;
   count?: number;
+}
+
+export type LogicPuzzleType = 'SUITE_LOGIQUE' | 'INTRUS' | 'DEDUCTION' | string;
+
+export interface LogicPuzzleData {
+  type?: LogicPuzzleType;
+  sequence?: Array<string | number>;
+  options?: string[];
+}
+
+export interface LogicPuzzleDTO {
+  id: number;
+  jeuId: number;
+  jeuTitre: string;
+  enonce: string;
+  sousType?: LogicPuzzleType | null;
+  donnees: string | null;
+  bonneReponse: string;
+  indice: string | null;
+  difficulte: number | null;
+}
+
+export interface CreateLogicPuzzleRequest {
+  jeuId: number;
+  enonce: string;
+  sousType?: LogicPuzzleType;
+  donnees?: string | null;
+  bonneReponse: string;
+  indice?: string | null;
+  difficulte?: number;
+}
+
+export interface UpdateLogicPuzzleRequest {
+  enonce?: string;
+  sousType?: LogicPuzzleType;
+  donnees?: string | null;
+  bonneReponse?: string;
+  indice?: string | null;
+  difficulte?: number;
 }
 
 export interface ReflexSettingsDTO {

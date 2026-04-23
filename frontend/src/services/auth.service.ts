@@ -59,4 +59,8 @@ export const authService = {
   isAdmin(): boolean {
     return (this.getRole() || "").toUpperCase() === "ADMIN";
   },
+
+  isSponsor(): boolean {
+    return (this.getRole() || "").toUpperCase() === "SPONSOR";
+  },
 };

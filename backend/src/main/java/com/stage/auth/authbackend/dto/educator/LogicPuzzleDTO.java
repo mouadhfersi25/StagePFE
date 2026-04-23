@@ -16,6 +16,7 @@ public class LogicPuzzleDTO {
     private String jeuTitre;
 
     private String enonce;
+    private String sousType;
     private String donnees;
     private String bonneReponse;
     private String indice;

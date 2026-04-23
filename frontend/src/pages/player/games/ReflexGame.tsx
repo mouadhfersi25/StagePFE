@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Target, Zap } from 'lucide-react';
 import userApi from '@/api/user/user.api';
+import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
+import { exitFullscreenSafely } from '@/utils/fullscreen';
 import type { ReflexSettingsDTO } from '@/api/types';
 
 interface Reaction {
@@ -21,18 +23,23 @@ export default function ReflexGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { gameId } = useParams();
-  const { game, mode } = location.state || {};
+  const { game, mode, roomCode, teamName } = location.state || {};
 
   const [gameState, setGameState] = useState<'ready' | 'waiting' | 'active' | 'toosoon' | 'missed'>('ready');
   const [round, setRound] = useState(0);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [targetPosition, setTargetPosition] = useState({ x: 50, y: 50 });
   const [startTime, setStartTime] = useState<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeRoundTokenRef = useRef(0);
+  const resolvedRoundTokenRef = useRef<number | null>(null);
+  const reactionDeadlinePerfRef = useRef<number | null>(null);
   const [settings, setSettings] = useState<ReflexSettingsDTO | null>(null);
   const [targetVariant, setTargetVariant] = useState<'icon' | 'color'>('icon');
   const [activeIsTrap, setActiveIsTrap] = useState(false);
   const [choiceTargets, setChoiceTargets] = useState<ChoiceTarget[]>([]);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const sessionStartMsRef = useRef<number>(Date.now());
 
   const totalRounds = settings?.nombreRounds ?? 10;
   const maxReactionMs = settings?.tempsReactionMaxMs ?? 2000;
@@ -54,31 +61,40 @@ export default function ReflexGame() {
   }, [gameId]);
 
   useEffect(() => {
+    sessionStartMsRef.current = Date.now();
+  }, [gameId]);
+
+  useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
   useEffect(() => {
-    if (isGameComplete && reactions.length === totalRounds) {
+    if (isGameComplete && reactions.length === totalRounds && !isFinishing) {
+      setIsFinishing(true);
       const successfulReactions = reactions.filter((r) => r.success);
       const avgReactionTime = successfulReactions.length > 0
         ? Math.round(successfulReactions.reduce((sum, r) => sum + r.time, 0) / successfulReactions.length)
         : 0;
+      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartMsRef.current) / 1000));
       
       const score = Math.max(250 - avgReactionTime * 0.5, 50);
       const accuracy = Math.round((successfulReactions.length / totalRounds) * 100);
 
-      setTimeout(() => {
+      setTimeout(async () => {
+        await exitFullscreenSafely();
         navigate('/player/game-result', {
           state: {
             game,
             mode,
+            roomCode,
+            teamName,
             sessionData: {
               scoreFinal: Math.round(score),
               accuracy,
               reactionTime: avgReactionTime,
-              duration: `${Math.floor(reactions.length * 3 / 60)} min`,
+              durationSeconds,
               reussite: accuracy >= 70,
               totalRounds,
               successfulRounds: successfulReactions.length,
@@ -87,7 +103,7 @@ export default function ReflexGame() {
         });
       }, 2000);
     }
-  }, [isGameComplete, reactions]);
+  }, [isGameComplete, reactions, totalRounds, isFinishing, game, mode, navigate]);
 
   const finalizeRound = (success: boolean, time: number, state: 'ready' | 'missed' | 'toosoon' = 'ready') => {
     setReactions((prev) => [...prev, { time, success }]);
@@ -103,7 +119,42 @@ export default function ReflexGame() {
     }, state === 'ready' ? 500 : 1000);
   };
 
+  const finalizeRoundSafe = (
+    success: boolean,
+    time: number,
+    state: 'ready' | 'missed' | 'toosoon' = 'ready'
+  ) => {
+    const token = activeRoundTokenRef.current;
+    if (resolvedRoundTokenRef.current === token) return;
+    resolvedRoundTokenRef.current = token;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    reactionDeadlinePerfRef.current = null;
+    finalizeRound(success, time, state);
+  };
+
+  const toPerfTimestamp = (eventTimeStamp?: number) => {
+    if (typeof eventTimeStamp !== 'number' || Number.isNaN(eventTimeStamp)) return performance.now();
+    // Some browsers expose epoch-based timestamps; convert to performance timeline.
+    if (eventTimeStamp > 1_000_000_000_000) {
+      return eventTimeStamp - performance.timeOrigin;
+    }
+    return eventTimeStamp;
+  };
+
+  const isWithinReactionWindow = (eventTimeStamp?: number) => {
+    const deadline = reactionDeadlinePerfRef.current;
+    if (deadline == null) return false;
+    return toPerfTimestamp(eventTimeStamp) <= deadline;
+  };
+
   const startRound = () => {
+    if (isGameComplete || isFinishing) return;
+    if (round === 0 && reactions.length === 0) {
+      sessionStartMsRef.current = Date.now();
+    }
     setGameState('waiting');
 
     const minDelay = Math.max(400, 1200 - gameplayDifficulty * 70);
@@ -139,63 +190,73 @@ export default function ReflexGame() {
       } else {
         setChoiceTargets([]);
       }
+      const roundToken = activeRoundTokenRef.current + 1;
+      activeRoundTokenRef.current = roundToken;
+      resolvedRoundTokenRef.current = null;
+      reactionDeadlinePerfRef.current = performance.now() + maxReactionMs;
       setStartTime(Date.now());
       setGameState('active');
       
       // Auto-miss after configured reaction window
       timeoutRef.current = setTimeout(() => {
+        if (activeRoundTokenRef.current !== roundToken) return;
+        if (resolvedRoundTokenRef.current === roundToken) return;
         // In GO_NO_GO, not clicking a trap is a success.
         if (reflexModel === 'GO_NO_GO' && isTrapRound) {
-          finalizeRound(true, maxReactionMs, 'ready');
+          finalizeRoundSafe(true, maxReactionMs, 'ready');
           return;
         }
-        finalizeRound(false, maxReactionMs, 'missed');
+        finalizeRoundSafe(false, maxReactionMs, 'missed');
       }, maxReactionMs);
     }, delay);
   };
 
   const handleClick = () => {
+    if (isGameComplete || isFinishing) return;
     if (gameState === 'ready') {
       startRound();
     } else if (gameState === 'waiting') {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       finalizeRound(false, 0, 'toosoon');
     } else if (gameState === 'active') {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const reactionTime = Date.now() - startTime;
-      // Clicking background in choice mode is always wrong.
-      if (reflexModel === 'CHOICE_REACTION') {
-        finalizeRound(false, reactionTime, 'missed');
+      if (!isWithinReactionWindow()) {
+        finalizeRoundSafe(false, maxReactionMs, 'missed');
         return;
       }
-      // In GO_NO_GO, clicking trap is wrong.
-      if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
-        finalizeRound(false, reactionTime, 'missed');
-        return;
-      }
-      finalizeRound(true, reactionTime, 'ready');
+      // In active state, clicking the game area (background) is never a success.
+      // Success is only validated by clicking the proper target element.
+      finalizeRoundSafe(false, reactionTime, 'missed');
     }
   };
 
   const handleTargetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isGameComplete || isFinishing) return;
     if (gameState === 'active') {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const reactionTime = Date.now() - startTime;
-      if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
-        finalizeRound(false, reactionTime, 'missed');
+      if (!isWithinReactionWindow(e.timeStamp)) {
+        finalizeRoundSafe(false, maxReactionMs, 'missed');
         return;
       }
-      finalizeRound(true, reactionTime, 'ready');
+      if (reflexModel === 'GO_NO_GO' && activeIsTrap) {
+        finalizeRoundSafe(false, reactionTime, 'missed');
+        return;
+      }
+      finalizeRoundSafe(true, reactionTime, 'ready');
     }
   };
 
   const handleChoiceTargetClick = (e: React.MouseEvent, target: ChoiceTarget) => {
     e.stopPropagation();
+    if (isGameComplete || isFinishing) return;
     if (gameState !== 'active') return;
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (!isWithinReactionWindow(e.timeStamp)) {
+      finalizeRoundSafe(false, maxReactionMs, 'missed');
+      return;
+    }
     const reactionTime = Date.now() - startTime;
-    finalizeRound(target.isCorrect, reactionTime, target.isCorrect ? 'ready' : 'missed');
+    finalizeRoundSafe(target.isCorrect, reactionTime, target.isCorrect ? 'ready' : 'missed');
   };
 
   const avgReactionTime = reactions.filter((r) => r.success).length > 0
@@ -228,9 +289,9 @@ export default function ReflexGame() {
   const stateMessage = getStateMessage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-slate-950/75 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -242,27 +303,28 @@ export default function ReflexGame() {
                     navigate('/player/dashboard');
                   }
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-6 h-6 text-gray-700" />
+                <ArrowLeft className="w-6 h-6 text-white" />
               </motion.button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{game?.title || 'Reflex Game'}</h1>
-                <p className="text-sm text-gray-600">Test your reaction speed</p>
+                <h1 className="text-xl font-bold text-white">{game?.title || 'Reflex Game'}</h1>
+                <p className="text-sm text-slate-300">Test your reaction speed</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="px-4 py-2 bg-purple-50 rounded-lg">
-                <span className="font-bold text-purple-600">
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-white/10 rounded-lg border border-white/20">
+                <span className="font-bold text-fuchsia-300">
                   Round: {round} / {totalRounds}
                 </span>
               </div>
               {avgReactionTime > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
-                  <Zap className="w-5 h-5 text-blue-600" />
-                  <span className="font-bold text-blue-600">{avgReactionTime}ms</span>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg border border-white/20">
+                  <Zap className="w-5 h-5 text-cyan-300" />
+                  <span className="font-bold text-cyan-300">{avgReactionTime}ms</span>
                 </div>
               )}
+              <PlayerHeaderActions />
             </div>
           </div>
         </div>
@@ -272,7 +334,7 @@ export default function ReflexGame() {
         {/* Game Area */}
         <motion.div
           onClick={handleClick}
-          className={`relative h-[500px] rounded-2xl shadow-2xl cursor-pointer overflow-hidden ${
+          className={`relative h-[500px] rounded-2xl shadow-2xl cursor-pointer overflow-hidden border border-white/15 ${
             gameState === 'waiting'
               ? 'bg-yellow-100'
               : gameState === 'active'
@@ -297,7 +359,7 @@ export default function ReflexGame() {
                 </p>
               </div>
               {gameState === 'ready' && round < totalRounds && (
-                <div className="text-gray-600 text-center">
+                <div className="text-slate-200 text-center">
                   <p className="mb-2">Click anywhere to start round {round + 1}</p>
                   <p className="text-sm">Wait for the target, then click it as fast as you can!</p>
                 </div>
@@ -367,31 +429,31 @@ export default function ReflexGame() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-white rounded-2xl p-6 shadow-lg"
+          className="mt-8 bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
         >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Your Results</h3>
+          <h3 className="text-lg font-bold text-white mb-4">Your Results</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Successful</p>
+            <div className="text-center p-4 bg-green-500/15 rounded-xl border border-green-400/30">
+              <p className="text-sm text-slate-300 mb-1">Successful</p>
               <p className="text-2xl font-bold text-green-600">
                 {reactions.filter((r) => r.success).length}
               </p>
             </div>
-            <div className="text-center p-4 bg-red-50 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Missed</p>
+            <div className="text-center p-4 bg-red-500/15 rounded-xl border border-red-400/30">
+              <p className="text-sm text-slate-300 mb-1">Missed</p>
               <p className="text-2xl font-bold text-red-600">
                 {reactions.filter((r) => !r.success).length}
               </p>
             </div>
-            <div className="text-center p-4 bg-blue-50 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Avg Time</p>
+            <div className="text-center p-4 bg-cyan-500/15 rounded-xl border border-cyan-400/30">
+              <p className="text-sm text-slate-300 mb-1">Avg Time</p>
               <p className="text-2xl font-bold text-blue-600">
                 {avgReactionTime || '—'}
                 {avgReactionTime > 0 && <span className="text-sm">ms</span>}
               </p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Best Time</p>
+              <p className="text-sm text-slate-300 mb-1">Best Time</p>
               <p className="text-2xl font-bold text-purple-600">
                 {reactions.filter((r) => r.success).length > 0
                   ? Math.min(...reactions.filter((r) => r.success).map((r) => r.time))

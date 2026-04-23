@@ -1,15 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Clock, CheckCircle, XCircle, Lightbulb } from 'lucide-react';
 import userApi from '@/api/user/user.api';
+import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
+import { exitFullscreenSafely } from '@/utils/fullscreen';
 import type { QuizQuestionDTO } from '@/api/types';
 
 export default function QuizGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { gameId } = useParams();
-  const { game, mode } = location.state || {};
+  const { game, mode, roomCode, teamName } = location.state || {};
   const [quizRows, setQuizRows] = useState<QuizQuestionDTO[]>([]);
 
   const questions = useMemo(() => {
@@ -36,8 +38,23 @@ export default function QuizGame() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [score, setScore] = useState(0);
+  const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
   const [timeLeft, setTimeLeft] = useState(180);
   const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(() => new Array(questions.length).fill(false));
+  const sessionStartMsRef = useRef<number>(Date.now());
+  const isFinishingRef = useRef(false);
+  const configuredDurationMinutes = useMemo(() => {
+    const fromGameField = Number(game?.durationMinutes);
+    if (Number.isFinite(fromGameField) && fromGameField > 0) return fromGameField;
+    const estimated = String(game?.estimatedTime ?? '').toLowerCase();
+    const match = estimated.match(/(\d+)/);
+    if (match) {
+      const parsed = Number(match[1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+    return 10;
+  }, [game]);
+  const configuredDurationSeconds = configuredDurationMinutes * 60;
 
   const totalQuestions = questions.length;
   const question = questions[currentQuestion];
@@ -63,8 +80,11 @@ export default function QuizGame() {
     setSelectedAnswer(null);
     setShowExplanation(false);
     setScore(0);
-    setTimeLeft(180);
-  }, [gameId, questions.length]);
+    setCorrectAnswersCount(0);
+    setTimeLeft(configuredDurationSeconds);
+    sessionStartMsRef.current = Date.now();
+    isFinishingRef.current = false;
+  }, [gameId, questions.length, configuredDurationSeconds]);
 
   // Timer
   useEffect(() => {
@@ -72,7 +92,7 @@ export default function QuizGame() {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0) {
-      handleFinishGame();
+      void handleFinishGame();
     }
   }, [timeLeft, showExplanation]);
 
@@ -98,12 +118,13 @@ export default function QuizGame() {
 
     if (selectedAnswer === question.correctAnswer) {
       setScore(score + question.points);
+      setCorrectAnswersCount((prev) => prev + 1);
     }
   };
 
   const handleNextQuestion = () => {
     if (isLastQuestion) {
-      handleFinishGame();
+      void handleFinishGame();
     } else {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedAnswer(null);
@@ -111,36 +132,40 @@ export default function QuizGame() {
     }
   };
 
-  const handleFinishGame = () => {
-    const accuracy = (answeredQuestions.filter(Boolean).length / totalQuestions) * 100;
-    const duration = `${Math.floor((180 - timeLeft) / 60)} min`;
-    
+  const handleFinishGame = async () => {
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
+    const accuracy = totalQuestions > 0 ? (correctAnswersCount / totalQuestions) * 100 : 0;
+    const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartMsRef.current) / 1000));
+    await exitFullscreenSafely();
     navigate('/player/game-result', {
       state: {
         game,
         mode,
+        roomCode,
+            teamName,
         sessionData: {
           scoreFinal: score,
           accuracy: Math.round(accuracy),
-          duration,
+          durationSeconds,
           reussite: score >= 80,
           totalQuestions,
-          correctAnswers: answeredQuestions.filter(Boolean).length,
+          correctAnswers: correctAnswersCount,
         },
       },
     });
   };
 
-  const timePercentage = (timeLeft / 180) * 100;
+  const timePercentage = configuredDurationSeconds > 0 ? (timeLeft / configuredDurationSeconds) * 100 : 0;
   const progressPercentage = totalQuestions > 0 ? ((currentQuestion + 1) / totalQuestions) * 100 : 0;
 
   const isCorrect = question ? selectedAnswer === question.correctAnswer : false;
 
   if (totalQuestions === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-8 shadow-lg max-w-md text-center">
-          <p className="text-gray-700 mb-4">No questions for this game yet. The educator can add and associate questions to this game.</p>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="bg-white/5 rounded-2xl p-8 border border-white/15 backdrop-blur-xl max-w-md text-center">
+          <p className="text-slate-200 mb-4">No questions for this game yet. The educator can add and associate questions to this game.</p>
           <button
             onClick={() => navigate('/player/dashboard')}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-medium"
@@ -153,9 +178,9 @@ export default function QuizGame() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-slate-950/75 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
@@ -167,30 +192,33 @@ export default function QuizGame() {
                     navigate('/player/dashboard');
                   }
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-6 h-6 text-gray-700" />
+                <ArrowLeft className="w-6 h-6 text-white" />
               </motion.button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{game?.title || 'Quiz Game'}</h1>
-                <p className="text-sm text-gray-600">
+                <h1 className="text-xl font-bold text-white">{game?.title || 'Quiz Game'}</h1>
+                <p className="text-sm text-slate-300">
                   Question {currentQuestion + 1} of {totalQuestions}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
-                <Clock className="w-5 h-5 text-blue-600" />
-                <span className="font-bold text-blue-600">{formatTime(timeLeft)}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <span className="font-bold text-blue-600">{formatTime(timeLeft)}</span>
+                </div>
+                <div className="px-4 py-2 bg-purple-50 rounded-lg">
+                  <span className="font-bold text-purple-600">Score: {score}</span>
+                </div>
               </div>
-              <div className="px-4 py-2 bg-purple-50 rounded-lg">
-                <span className="font-bold text-purple-600">Score: {score}</span>
-              </div>
+              <PlayerHeaderActions />
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="relative h-2 bg-white/20 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercentage}%` }}
@@ -199,7 +227,7 @@ export default function QuizGame() {
           </div>
 
           {/* Time Bar */}
-          <div className="relative h-1 bg-gray-200 rounded-full overflow-hidden mt-2">
+          <div className="relative h-1 bg-white/20 rounded-full overflow-hidden mt-2">
             <motion.div
               animate={{ width: `${timePercentage}%` }}
               className={`absolute inset-y-0 left-0 rounded-full ${
@@ -217,7 +245,7 @@ export default function QuizGame() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="bg-white rounded-2xl p-8 shadow-lg"
+            className="bg-white/5 rounded-2xl p-8 border border-white/15 backdrop-blur-xl"
           >
             {/* Question */}
             <div className="mb-8">
@@ -225,9 +253,9 @@ export default function QuizGame() {
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0">
                   {currentQuestion + 1}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">{question.question}</h2>
+                <h2 className="text-2xl font-bold text-white">{question.question}</h2>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-slate-300">
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold">
                   {question.points} points
                 </span>
@@ -256,7 +284,7 @@ export default function QuizGame() {
                         ? 'bg-red-50 border-red-500 text-red-900'
                         : isSelected
                         ? 'bg-purple-50 border-purple-500 text-purple-900'
-                        : 'bg-white border-gray-300 text-gray-900 hover:border-purple-300 hover:bg-purple-50'
+                        : 'bg-white/5 border-white/20 text-slate-100 hover:border-fuchsia-300 hover:bg-white/10'
                     } ${showExplanation ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     <div className="flex items-center justify-between">
@@ -291,8 +319,8 @@ export default function QuizGame() {
                         {isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
                       </h3>
                       <div className="flex items-start gap-2">
-                        <Lightbulb className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-gray-700">{question.explanation}</p>
+                        <Lightbulb className="w-5 h-5 text-slate-300 flex-shrink-0 mt-0.5" />
+                        <p className="text-slate-200">{question.explanation}</p>
                       </div>
                       {isCorrect && (
                         <p className="mt-2 font-semibold text-green-700">+{question.points} points</p>
@@ -313,7 +341,7 @@ export default function QuizGame() {
                   disabled={selectedAnswer === null}
                   className={`flex-1 py-4 rounded-xl font-bold text-lg transition-all ${
                     selectedAnswer === null
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      ? 'bg-white/15 text-slate-400 cursor-not-allowed'
                       : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
                   }`}
                 >

@@ -34,7 +34,7 @@ function mapStoreUserToEduGameUser(storeUser: { email?: string; role?: string } 
     PARENT: 'parent',
     EDUCATEUR: 'educator',
     ADMIN: 'admin',
-    SPONSOR: 'admin',
+    SPONSOR: 'sponsor',
   };
   return {
     id: '1',
@@ -55,6 +55,24 @@ function getLocalProfileFallback() {
   };
 }
 
+function computeAgeFromDateOfBirth(value?: string | null): number | null {
+  if (!value) return null;
+  const birth = new Date(value);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 ? age : null;
+}
+
+function fallbackXpToNextLevel(levelRaw?: number | null): number {
+  const level = Math.max(1, levelRaw ?? 1);
+  return Math.max(250, (level * 150) + (level * level * 55));
+}
+
 export function EduGameAuthBridge({ children }: { children: ReactNode }) {
   const storeAuth = useContext(StoreAuthContext);
   const user = useMemo(() => mapStoreUserToEduGameUser(storeAuth?.user ?? null), [storeAuth?.user]);
@@ -67,22 +85,46 @@ export function EduGameAuthBridge({ children }: { children: ReactNode }) {
       const u = data as any;
       const localFallback = getLocalProfileFallback();
       const fullName = [u.prenom, u.nom].filter(Boolean).join(' ').trim();
+      const computedAge = computeAgeFromDateOfBirth(u.dateDeNaissance);
 
       setPlayerProfile((prev) => ({
         ...prev!,
         id: u.id || user.id,
         name: fullName || u.name || user.name,
-        age: u.age || 12,
+        age: u.age || computedAge || 12,
         avatar: u.avatarUrl || u.avatar || localFallback.avatar || '👦',
+        nom: u.nom || '',
+        prenom: u.prenom || '',
+        email: u.email || user.email,
+        telephone: u.telephone ?? null,
+        avatarUrl: u.avatarUrl ?? null,
+        role: u.role || '',
+        etatCompte: u.etatCompte || '',
+        enabled: Boolean(u.enabled),
+        dateDeNaissance: u.dateDeNaissance ?? null,
         onboardingCompleted: u.onboardingCompleted,
+        idRegion: u.idRegion ?? null,
+        idPays: u.idPays ?? null,
+        idGenre: u.idGenre ?? null,
         paysNom: u.paysNom || localFallback.paysNom || '',
         regionNom: u.regionNom || localFallback.regionNom || '',
-        level: u.level || 1,
-        xp: u.xp || 0,
-        xpToNextLevel: 100,
-        totalScore: u.totalScore || 0,
+        niveau: u.niveau || 1,
+        scoreTotal: u.scoreTotal || 0,
+        pointsExperience: u.pointsExperience || 0,
+        currentStreakDays: typeof u.currentStreakDays === 'number' ? u.currentStreakDays : 0,
+        bestStreakDays: typeof u.bestStreakDays === 'number' ? u.bestStreakDays : 0,
+        lastStreakDate: u.lastStreakDate ?? null,
+        dateDerniereConnexion: u.dateDerniereConnexion ?? null,
+        dateCreation: u.dateCreation ?? null,
+        level: u.niveau || 1,
+        xp: u.pointsExperience || 0,
+        xpToNextLevel:
+          typeof u.xpToNextLevel === 'number' && u.xpToNextLevel > 0
+            ? u.xpToNextLevel
+            : fallbackXpToNextLevel(u.niveau || 1),
+        totalScore: u.scoreTotal || 0,
         badgesEarned: 0,
-        currentStreak: 0,
+        currentStreak: typeof u.currentStreakDays === 'number' ? u.currentStreakDays : 0,
         totalSessions: 0,
         weeklyPlayTime: '0 min',
         averageSuccessRate: 0,

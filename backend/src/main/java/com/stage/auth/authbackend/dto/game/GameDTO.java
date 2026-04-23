@@ -36,6 +36,7 @@ public class GameDTO {
     private Integer dureeMinutes;
 
     private String icone;
+    private String coverImageUrl;
 
     private EtatJeu etat;
     private String latestRefusalReason;

@@ -9,6 +9,7 @@ import type {
   QuizQuestionDTO,
   MemoryCardDTO,
   GameAiReviewDTO,
+  AdminScoringDistributionDTO,
 } from "../types/api.types";
 
 const adminApi = {
@@ -19,6 +20,10 @@ const adminApi = {
   reactivateUser: (id: number | string) => api.post(ADMIN_ENDPOINTS.REACTIVATE_USER(id)),
   updateUserRole: (id: number | string, role: string) =>
     api.put(ADMIN_ENDPOINTS.USER_ROLE(id), { role: String(role) }),
+  getActiveSessionsCount: () =>
+    api.get<{ activeSessions: number }>(ADMIN_ENDPOINTS.ACTIVE_SESSIONS_COUNT),
+  getScoringDistribution: () =>
+    api.get<AdminScoringDistributionDTO[]>(ADMIN_ENDPOINTS.SCORING_DISTRIBUTION),
   getGames: () => api.get(ADMIN_ENDPOINTS.GAMES),
   getGameById: (id: number | string) => api.get(ADMIN_ENDPOINTS.GAME_BY_ID(id)),
   getGameAiReview: (id: number | string) => api.get<GameAiReviewDTO>(ADMIN_ENDPOINTS.GAME_AI_REVIEW(id)),

@@ -10,6 +10,9 @@ import type {
   UpdateMemoryCardRequest,
   EducatorDashboardStatsDTO,
   GenerateQuizPreviewRequest,
+  LogicPuzzleDTO,
+  CreateLogicPuzzleRequest,
+  UpdateLogicPuzzleRequest,
   GenerateReflexSettingsPreviewRequest,
   ReflexSettingsDTO,
   CreateOrUpdateReflexSettingsRequest,
@@ -23,6 +26,25 @@ const educatorApi = {
     api.put<GameDTO>(EDUCATOR_ENDPOINTS.GAME_BY_ID(id), data),
   submitGame: (id: number | string) =>
     api.patch<GameDTO>(EDUCATOR_ENDPOINTS.GAME_SUBMIT(id)),
+  generateGameCover: (id: number | string) =>
+    api.post<GameDTO>(EDUCATOR_ENDPOINTS.GAME_COVER_GENERATE(id)),
+  generateGameCoverPreview: (data: {
+    titre?: string;
+    description?: string;
+    typeJeu?: 'QUIZ' | 'MEMOIRE' | 'LOGIQUE' | 'REFLEXE';
+    ageMin?: number;
+    ageMax?: number;
+    difficulte?: number;
+  }) => api.post<{ coverImageUrl: string }>(EDUCATOR_ENDPOINTS.GAME_COVER_GENERATE_PREVIEW, data),
+  deleteGameCover: (id: number | string) =>
+    api.delete<GameDTO>(EDUCATOR_ENDPOINTS.GAME_COVER_DELETE(id)),
+  uploadGameCover: (id: number | string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<GameDTO>(EDUCATOR_ENDPOINTS.GAME_COVER_UPLOAD(id), form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   deleteGame: (id: number | string) => api.delete(EDUCATOR_ENDPOINTS.GAME_BY_ID(id)),
   getQuestions: (gameId: number) =>
     api.get<QuizQuestionDTO[]>(EDUCATOR_ENDPOINTS.QUESTIONS, { params: { gameId } }),
@@ -35,6 +57,14 @@ const educatorApi = {
   deleteQuestion: (id: number) => api.delete(EDUCATOR_ENDPOINTS.QUESTION_BY_ID(id)),
   generateQuizPreview: (data: GenerateQuizPreviewRequest) =>
     api.post<QuizQuestionDTO[]>(EDUCATOR_ENDPOINTS.QUESTIONS_AI_GENERATE_PREVIEW, data),
+  getLogicPuzzles: (gameId: number) =>
+    api.get<LogicPuzzleDTO[]>(EDUCATOR_ENDPOINTS.LOGIC_PUZZLES, { params: { gameId } }),
+  createLogicPuzzle: (data: CreateLogicPuzzleRequest) =>
+    api.post<LogicPuzzleDTO>(EDUCATOR_ENDPOINTS.LOGIC_PUZZLES, data),
+  updateLogicPuzzle: (id: number, data: UpdateLogicPuzzleRequest) =>
+    api.put<LogicPuzzleDTO>(`${EDUCATOR_ENDPOINTS.LOGIC_PUZZLES}/${id}`, data),
+  deleteLogicPuzzle: (id: number) =>
+    api.delete(`${EDUCATOR_ENDPOINTS.LOGIC_PUZZLES}/${id}`),
   getReflexSettings: (gameId: number) =>
     api.get<ReflexSettingsDTO>(EDUCATOR_ENDPOINTS.REFLEX_SETTINGS, { params: { gameId } }),
   upsertReflexSettings: (data: CreateOrUpdateReflexSettingsRequest) =>

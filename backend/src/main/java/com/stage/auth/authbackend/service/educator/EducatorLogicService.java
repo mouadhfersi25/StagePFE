@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class EducatorLogicService {
 
     private final PuzzleLogiqueRepository puzzleLogiqueRepository;
     private final JeuRepository jeuRepository;
+    private static final Pattern TYPE_JSON_PATTERN = Pattern.compile("\"type\"\\s*:\\s*\"([^\"]+)\"");
 
     public List<LogicPuzzleDTO> listByGame(Long jeuId) {
         Jeu jeu = validateJeuType(jeuId, TypeJeu.LOGIQUE);
@@ -41,6 +44,7 @@ public class EducatorLogicService {
         PuzzleLogique puzzle = PuzzleLogique.builder()
                 .jeu(jeu)
                 .enonce(request.getEnonce())
+                .sousType(normalizeSousType(request.getSousType(), request.getDonnees()))
                 .donnees(request.getDonnees())
                 .bonneReponse(request.getBonneReponse())
                 .indice(request.getIndice())
@@ -60,6 +64,9 @@ public class EducatorLogicService {
         }
         EducatorGameEditPolicy.requireDraft(puzzle.getJeu());
         if (request.getEnonce() != null) puzzle.setEnonce(request.getEnonce());
+        if (request.getSousType() != null || request.getDonnees() != null) {
+            puzzle.setSousType(normalizeSousType(request.getSousType(), request.getDonnees() != null ? request.getDonnees() : puzzle.getDonnees()));
+        }
         if (request.getDonnees() != null) puzzle.setDonnees(request.getDonnees());
         if (request.getBonneReponse() != null) puzzle.setBonneReponse(request.getBonneReponse());
         if (request.getIndice() != null) puzzle.setIndice(request.getIndice());
@@ -101,10 +108,27 @@ public class EducatorLogicService {
                 .jeuId(jeu.getId())
                 .jeuTitre(jeu.getTitre())
                 .enonce(p.getEnonce())
+                .sousType(normalizeSousType(p.getSousType(), p.getDonnees()))
                 .donnees(p.getDonnees())
                 .bonneReponse(p.getBonneReponse())
                 .indice(p.getIndice())
                 .difficulte(p.getDifficulte())
                 .build();
+    }
+
+    private static String normalizeSousType(String rawSousType, String rawDonnees) {
+        String candidate = (rawSousType != null && !rawSousType.isBlank()) ? rawSousType : extractTypeFromDonnees(rawDonnees);
+        if (candidate == null || candidate.isBlank()) return "DEDUCTION";
+        String normalized = candidate.trim().toUpperCase();
+        return switch (normalized) {
+            case "SUITE_LOGIQUE", "INTRUS", "DEDUCTION" -> normalized;
+            default -> "DEDUCTION";
+        };
+    }
+
+    private static String extractTypeFromDonnees(String rawDonnees) {
+        if (rawDonnees == null || rawDonnees.isBlank()) return null;
+        Matcher matcher = TYPE_JSON_PATTERN.matcher(rawDonnees);
+        return matcher.find() ? matcher.group(1) : null;
     }
 }

@@ -1,11 +1,14 @@
 package com.stage.auth.authbackend.service.admin;
 
-import com.stage.auth.authbackend.dto.user.UpdateRoleRequest;
-import com.stage.auth.authbackend.dto.user.UserDTO;
+import com.stage.auth.authbackend.dto.admin.AdminScoringDistributionDTO;
+import com.stage.auth.authbackend.dto.player.UpdateRoleRequest;
+import com.stage.auth.authbackend.dto.player.UserDTO;
 import com.stage.auth.authbackend.entity.EtatCompte;
+import com.stage.auth.authbackend.entity.EtatSession;
 import com.stage.auth.authbackend.entity.Role;
 import com.stage.auth.authbackend.entity.User;
 import com.stage.auth.authbackend.exception.ApiException;
+import com.stage.auth.authbackend.repository.game.SessionJeuRepository;
 import com.stage.auth.authbackend.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ import java.util.stream.Collectors;
 public class AdminUserService {
 
     private final UserRepository userRepository;
+    private final SessionJeuRepository sessionJeuRepository;
 
     /**
      * Récupère un utilisateur par id (réservé à l'admin). UserDTO = 100 % table users.
@@ -94,6 +98,14 @@ public class AdminUserService {
         return toDTO(target);
     }
 
+    public long getActiveSessionsCount() {
+        return sessionJeuRepository.countByEtatSession(EtatSession.EN_COURS);
+    }
+
+    public List<AdminScoringDistributionDTO> getScoringDistribution() {
+        return sessionJeuRepository.fetchScoringDistributionByGame();
+    }
+
     private UserDTO toDTO(User user) {
         return UserDTO.builder()
                 .id(user.getId())
@@ -110,6 +122,9 @@ public class AdminUserService {
                 .niveau(user.getNiveau())
                 .scoreTotal(user.getScoreTotal())
                 .pointsExperience(user.getPointsExperience())
+                .currentStreakDays(user.getCurrentStreakDays())
+                .bestStreakDays(user.getBestStreakDays())
+                .lastStreakDate(user.getLastStreakDate())
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
                 .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
                 .onboardingCompleted(user.isOnboardingCompleted())

@@ -31,5 +31,15 @@ public class DemandeRecompense {
     @ManyToOne(optional = false)
     @JoinColumn(name = "id_recompense", nullable = false)
     private Recompense recompense;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.dateDemande == null) {
+            this.dateDemande = LocalDate.now();
+        }
+        if (this.statut == null || this.statut.isBlank()) {
+            this.statut = "PENDING";
+        }
+    }
 }
 

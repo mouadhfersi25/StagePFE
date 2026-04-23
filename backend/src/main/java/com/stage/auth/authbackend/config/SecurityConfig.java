@@ -37,6 +37,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/countriesnow/**",
+                                "/api/ext-ads/**",
+                                "/ws/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/error"
@@ -44,6 +46,9 @@ public class SecurityConfig {
 
                         // ✅ bonne pratique Spring : ADMIN -> ROLE_ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // Sponsor : gestion des campagnes/publicités/récompenses
+                        .requestMatchers("/api/sponsor/**").hasAnyRole("SPONSOR", "ADMIN")
 
                         // Éducateur : gestion du contenu (questions, jeux, etc.)
                         // Admin peut aussi consulter, afin d'éviter 403 pour /api/educator pour les admins.

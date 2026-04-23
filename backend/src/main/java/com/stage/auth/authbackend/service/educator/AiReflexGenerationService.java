@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stage.auth.authbackend.dto.educator.ReflexSettingsDTO;
 import com.stage.auth.authbackend.entity.Jeu;
+import com.stage.auth.authbackend.entity.ReflexModel;
+import com.stage.auth.authbackend.entity.ReflexStimulusType;
 import com.stage.auth.authbackend.entity.TypeJeu;
 import com.stage.auth.authbackend.exception.ApiException;
 import com.stage.auth.authbackend.repository.game.JeuRepository;
@@ -63,10 +65,10 @@ public class AiReflexGenerationService {
         String responseText = callGemini(prompt);
         try {
             JsonNode root = objectMapper.readTree(extractJson(responseText));
-            String modeleReflexe = normalizeModel(root.path("modeleReflexe").asText(null));
+            ReflexModel modeleReflexe = normalizeModel(root.path("modeleReflexe").asText(null));
             int nombreRounds = clamp(root.path("nombreRounds").asInt(10), 1, 30);
             int tempsReactionMaxMs = clamp(root.path("tempsReactionMaxMs").asInt(2000), 500, 5000);
-            String typeStimuli = normalizeStimuli(root.path("typeStimuli").asText(null));
+            ReflexStimulusType typeStimuli = normalizeStimuli(root.path("typeStimuli").asText(null));
             int difficulte = clamp(root.path("difficulte").asInt(jeu.getDifficulte() == null ? 5 : jeu.getDifficulte()), 0, 10);
             int noGoRatio = clamp(root.path("noGoRatio").asInt(30), 10, 90);
             int choiceTargetCount = clamp(root.path("choiceTargetCount").asInt(3), 2, 6);
@@ -174,20 +176,26 @@ public class AiReflexGenerationService {
         }
     }
 
-    private static String normalizeModel(String raw) {
+    private static ReflexModel normalizeModel(String raw) {
         String value = raw == null ? "" : raw.trim().toUpperCase();
-        if ("GO_NO_GO".equals(value) || "CHOICE_REACTION".equals(value) || "CLASSIC".equals(value)) {
-            return value;
+        if ("GO_NO_GO".equals(value)) {
+            return ReflexModel.GO_NO_GO;
         }
-        return "CLASSIC";
+        if ("CHOICE_REACTION".equals(value)) {
+            return ReflexModel.CHOICE_REACTION;
+        }
+        return ReflexModel.CLASSIC;
     }
 
-    private static String normalizeStimuli(String raw) {
+    private static ReflexStimulusType normalizeStimuli(String raw) {
         String value = raw == null ? "" : raw.trim().toUpperCase();
-        if ("COLOR_FLASH".equals(value) || "MIXED".equals(value) || "TARGET_ICON".equals(value)) {
-            return value;
+        if ("COLOR_FLASH".equals(value)) {
+            return ReflexStimulusType.COLOR_FLASH;
         }
-        return "TARGET_ICON";
+        if ("MIXED".equals(value)) {
+            return ReflexStimulusType.MIXED;
+        }
+        return ReflexStimulusType.TARGET_ICON;
     }
 
     private static int clamp(int value, int min, int max) {

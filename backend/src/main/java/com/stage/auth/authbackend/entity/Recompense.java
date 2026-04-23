@@ -34,8 +34,22 @@ public class Recompense {
     @Column(name = "date_creation")
     private LocalDate dateCreation;
 
+    @Builder.Default
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
+
     @ManyToOne
     @JoinColumn(name = "id_sponsor")
     private Sponsor sponsor;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.dateCreation == null) {
+            this.dateCreation = LocalDate.now();
+        }
+        if (this.active == null) {
+            this.active = true;
+        }
+    }
 }
 

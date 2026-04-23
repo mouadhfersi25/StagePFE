@@ -38,14 +38,16 @@ public class ParametresReflexe {
     /**
      * Type de stimuli utilisés : COULEURS, FORMES, SONS, etc.
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "type_stimuli", length = 50)
-    private String typeStimuli;
+    private ReflexStimulusType typeStimuli;
 
     /**
      * Modèle de gameplay réflexe : CLASSIC, GO_NO_GO, CHOICE_REACTION.
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "modele_reflexe", length = 50)
-    private String modeleReflexe;
+    private ReflexModel modeleReflexe;
 
     /**
      * Ratio de pièges (0-100) utilisé pour GO_NO_GO.

@@ -36,6 +36,13 @@ public class PuzzleLogique {
     private String donnees;
 
     /**
+     * Sous-type métier normalisé du puzzle logique.
+     * Valeurs attendues: SUITE_LOGIQUE, INTRUS, DEDUCTION.
+     */
+    @Column(name = "sous_type", length = 40, nullable = false)
+    private String sousType;
+
+    /**
      * Bonne réponse attendue (texte).
      */
     @Column(name = "bonne_reponse", columnDefinition = "TEXT", nullable = false)

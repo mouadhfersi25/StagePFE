@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Clock, RotateCcw } from 'lucide-react';
 import userApi from '@/api/user/user.api';
+import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
+import { exitFullscreenSafely } from '@/utils/fullscreen';
 import type { MemoryCardDTO } from '@/api/types';
 
 const DEFAULT_EMOJIS = ['🎮', '🎯', '🎨', '🎭', '🎪', '🎸', '🎺', '🎹'];
@@ -19,7 +21,7 @@ export default function MemoryGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { gameId } = useParams();
-  const { game, mode } = location.state || {};
+  const { game, mode, roomCode, teamName } = location.state || {};
   const [memoryCards, setMemoryCards] = useState<MemoryCardDTO[]>([]);
 
   const emojiList = useMemo(() => {
@@ -103,18 +105,20 @@ export default function MemoryGame() {
   // Check for game completion
   useEffect(() => {
     if (matches === totalPairs && gameStarted) {
-      setTimeout(() => {
+      setTimeout(async () => {
         const score = Math.max(200 - moves * 2 - Math.floor(timeElapsed / 5), 50);
         const accuracy = Math.round((matches * 2 / moves) * 100);
-
+        await exitFullscreenSafely();
         navigate('/player/game-result', {
           state: {
             game,
             mode,
+            roomCode,
+            teamName,
             sessionData: {
               scoreFinal: score,
               accuracy: Math.min(accuracy, 100),
-              duration: formatTime(timeElapsed),
+              durationSeconds: Math.max(1, timeElapsed),
               reussite: accuracy >= 70,
               moves,
               matches,
@@ -172,9 +176,9 @@ export default function MemoryGame() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-slate-950/75 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -186,37 +190,38 @@ export default function MemoryGame() {
                     navigate('/player/dashboard');
                   }
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-6 h-6 text-gray-700" />
+                <ArrowLeft className="w-6 h-6 text-white" />
               </motion.button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{game?.title || 'Memory Game'}</h1>
-                <p className="text-sm text-gray-600">Match all pairs</p>
+                <h1 className="text-xl font-bold text-white">{game?.title || 'Memory Game'}</h1>
+                <p className="text-sm text-slate-300">Match all pairs</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={initializeGame}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 text-slate-100 rounded-lg hover:bg-white/20 transition-colors border border-white/20"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span className="font-medium">Restart</span>
               </motion.button>
+              <PlayerHeaderActions />
             </div>
           </div>
           <div className="flex items-center gap-6 mt-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <span className="font-bold text-blue-600">{formatTime(timeElapsed)}</span>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg border border-white/20">
+              <Clock className="w-5 h-5 text-cyan-300" />
+              <span className="font-bold text-cyan-300">{formatTime(timeElapsed)}</span>
             </div>
-            <div className="px-4 py-2 bg-purple-50 rounded-lg">
-              <span className="font-bold text-purple-600">Moves: {moves}</span>
+            <div className="px-4 py-2 bg-white/10 rounded-lg border border-white/20">
+              <span className="font-bold text-fuchsia-300">Moves: {moves}</span>
             </div>
-            <div className="px-4 py-2 bg-green-50 rounded-lg">
-              <span className="font-bold text-green-600">
+            <div className="px-4 py-2 bg-white/10 rounded-lg border border-white/20">
+              <span className="font-bold text-emerald-300">
                 Matches: {matches} / {totalPairs}
               </span>
             </div>
@@ -260,7 +265,7 @@ export default function MemoryGame() {
                 </div>
                 {/* Card Front */}
                 <div
-                  className="absolute inset-0 bg-white rounded-2xl flex items-center justify-center shadow-lg"
+                  className="absolute inset-0 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg border border-white/20"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
@@ -278,10 +283,10 @@ export default function MemoryGame() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-8 bg-white rounded-2xl p-6 text-center max-w-2xl mx-auto shadow-lg"
+            className="mt-8 bg-white/5 rounded-2xl p-6 text-center max-w-2xl mx-auto border border-white/15 backdrop-blur-xl"
           >
-            <h3 className="text-xl font-bold text-gray-900 mb-2">How to Play</h3>
-            <p className="text-gray-600">
+            <h3 className="text-xl font-bold text-white mb-2">How to Play</h3>
+            <p className="text-slate-300">
               Click on cards to flip them. Find all matching pairs in the least moves and fastest time!
             </p>
           </motion.div>
