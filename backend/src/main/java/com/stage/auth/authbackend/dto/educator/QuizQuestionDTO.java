@@ -23,6 +23,9 @@ public class QuizQuestionDTO {
     private String bonneReponse;
     /** Liste des options de réponse (QCM). */
     private java.util.List<String> options;
+    private String sousType;
+    private String mediaUrl;
+    private String promptAudioUrl;
     private String explication;
     private Integer difficulte;
 }

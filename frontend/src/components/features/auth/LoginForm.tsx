@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import userApi from "../../../api/user/user.api";
 import { authService } from "../../../services/auth.service";
 import { ROLES } from "../../../utils/constants";
 import { formStyles } from "../../../styles/formStyles";
@@ -7,6 +9,8 @@ import { getErrorMessage } from "../../../utils/errorHandler";
 import { validateEmail, validatePassword } from "../../../utils/validators";
 
 export default function LoginForm() {
+  const location = useLocation();
+  const registrationMessage = (location.state as { message?: string } | null)?.message ?? null;
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -113,7 +117,16 @@ export default function LoginForm() {
       if (role === ROLES.ADMIN) {
         window.location.href = "/admin/dashboard";
       } else if (role === ROLES.JOUEUR) {
-        window.location.href = "/player/dashboard";
+        try {
+          const { data } = await userApi.getMe();
+          const isPlayer = (data.role || "").toUpperCase() === ROLES.JOUEUR;
+          const needsOnboarding = isPlayer && !data.onboardingCompleted;
+          window.location.href = needsOnboarding
+            ? "/player/profile?onboarding=true"
+            : "/player/dashboard";
+        } catch {
+          window.location.href = "/player/dashboard";
+        }
       } else if (role === ROLES.EDUCATEUR) {
         window.location.href = "/educator/dashboard";
       } else if (role === ROLES.PARENT) {
@@ -148,6 +161,12 @@ export default function LoginForm() {
   return (
     <>
       <form onSubmit={handleSubmit} style={styles.form} noValidate>
+        {registrationMessage && (
+          <div style={styles.success}>
+            <span style={{ fontSize: "20px" }}>✅</span>
+            <span>{registrationMessage}</span>
+          </div>
+        )}
         {/* Affichage de l'erreur globale */}
         {(errorPersistRef.current || errorMessage) && (
           <div 

@@ -1,14 +1,13 @@
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { LayoutDashboard, HelpCircle, Gamepad2, BarChart3, LogOut, Brain, Zap, Puzzle } from 'lucide-react';
+import { LayoutDashboard, HelpCircle, Gamepad2, BarChart3, LogOut, Brain, Zap, Puzzle, Mic } from 'lucide-react';
 import { useAuth } from '@/context';
-import { useNavigate } from 'react-router';
 
 interface NavItem {
   name: string;
   path: string;
   icon: React.ReactNode;
-  section: 'overview' | 'content' | 'games' | 'insights';
+  section: 'overview' | 'content' | 'oral' | 'games' | 'insights';
   badge?: string;
   badgeColor?: string;
 }
@@ -25,6 +24,14 @@ const navItems: NavItem[] = [
     path: '/educator/games/manage',
     icon: <Gamepad2 className="w-5 h-5" />,
     section: 'content',
+  },
+  {
+    name: 'Atelier oral',
+    path: '/educator/voice/series',
+    icon: <Mic className="w-5 h-5" />,
+    section: 'oral',
+    badge: '🎙️',
+    badgeColor: 'bg-rose-100 text-rose-700',
   },
   {
     name: 'Quiz',
@@ -90,13 +97,10 @@ export default function EducatorSidebar() {
 
   return (
     <div className="sticky top-0 w-64 h-screen bg-gradient-to-b from-emerald-50 via-white to-teal-50/40 border-r border-gray-200 flex flex-col shrink-0">
-      {/* Logo / Brand */}
+      {/* Brand */}
       <div className="p-6 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
-            <span className="text-2xl">📚</span>
-          </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-bold text-gray-900">Educator Panel</h2>
             <p className="text-xs text-gray-500">Create questions & manage games</p>
           </div>
@@ -148,6 +152,38 @@ export default function EducatorSidebar() {
                 >
                   {item.icon}
                   <span className="font-medium text-sm">{item.name}</span>
+                </motion.div>
+              </Link>
+            );
+          })}
+
+        {/* Atelier oral */}
+        <p className="px-3 mt-3 mb-1 text-[11px] font-semibold tracking-wide text-emerald-700/80 uppercase">
+          Atelier oral
+        </p>
+        {navItems
+          .filter((item) => item.section === 'oral')
+          .map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <Link key={item.path} to={item.path}>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+                      : 'text-gray-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  {item.icon}
+                  <div className="flex-1 flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm">{item.name}</span>
+                    {item.badge && !isActive && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-md font-semibold ${item.badgeColor}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
                 </motion.div>
               </Link>
             );

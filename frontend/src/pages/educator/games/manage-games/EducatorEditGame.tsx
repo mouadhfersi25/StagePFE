@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2, FileText, Sparkles, Upload, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
-import type { GameDTO, TypeJeu, ModeJeu } from '@/api/types';
+import type { GameDTO, TypeJeu, ModeJeu, QuizPlayMode, QuizVariant } from '@/api/types';
+import QuizVariantPicker, { QuizVariantBadge } from '@/components/educator/QuizVariantPicker';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import {
@@ -14,6 +15,7 @@ import {
   runValidations,
   type ValidationResult,
 } from '@/utils/formValidation';
+import { dataUrlToImageFile } from '@/utils/dataUrlToImageFile';
 
 const ICONS = ['🎮', '🧮', '🧠', '🎯', '⚡', '🔬', '🦁', '🌟', '🚀', '🎨'];
 
@@ -67,8 +69,29 @@ export default function EducatorEditGame() {
     icone: '🎮',
     coverImageUrl: '',
     actif: true,
+    quizPlayMode: 'CLASSIC' as QuizPlayMode,
+    quizVariant: 'DEFAULT' as QuizVariant,
   });
   const [previewCoverSrc, setPreviewCoverSrc] = useState('');
+  const [coverLoading, setCoverLoading] = useState(false);
+
+  useEffect(() => {
+    const url = formData.coverImageUrl?.trim();
+    if (!url) {
+      setPreviewCoverSrc('');
+      setCoverLoading(false);
+      return;
+    }
+    if (url.startsWith('data:image/')) {
+      setPreviewCoverSrc(url);
+      setCoverLoading(false);
+      return;
+    }
+    if (url.startsWith('http')) {
+      setCoverLoading(true);
+    }
+    setPreviewCoverSrc(url);
+  }, [formData.coverImageUrl]);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -92,6 +115,8 @@ export default function EducatorEditGame() {
             icone: g.icone ?? TYPE_ICONS[g.typeJeu] ?? '🎮',
             coverImageUrl: g.coverImageUrl ?? '',
             actif: g.actif ?? true,
+            quizPlayMode: g.quizPlayMode ?? 'CLASSIC',
+            quizVariant: g.quizVariant ?? 'DEFAULT',
           });
         }
       })
@@ -154,11 +179,6 @@ export default function EducatorEditGame() {
     return () => { cancelled = true; };
   }, [game, activeTab]);
 
-  useEffect(() => {
-    const url = formData.coverImageUrl?.trim();
-    setPreviewCoverSrc(url || '');
-  }, [formData.coverImageUrl]);
-
   const validate = (): boolean => {
     const ageMaxErr = validateInteger(formData.ageMax, 7, 18, 'Âge max entre 7 et 18')
       ?? (formData.ageMin > formData.ageMax ? "L'âge max doit être ≥ âge min" : null);
@@ -183,6 +203,9 @@ export default function EducatorEditGame() {
     if (!validate()) return;
     setSubmitting(true);
     try {
+      const coverTrim = formData.coverImageUrl.trim();
+      const isDataUrlCover = coverTrim.startsWith('data:image/');
+
       await educatorApi.updateGame(Number(id), {
         titre: formData.titre.trim(),
         description: formData.description.trim() || undefined,
@@ -191,11 +214,26 @@ export default function EducatorEditGame() {
         ageMax: formData.ageMax,
         dureeMinutes: formData.dureeMinutes,
         icone: formData.icone || undefined,
-        coverImageUrl: formData.coverImageUrl.trim() || undefined,
+        coverImageUrl: isDataUrlCover ? undefined : coverTrim || undefined,
         typeJeu: formData.typeJeu,
         modeJeu: formData.modeJeu,
         actif: formData.actif,
+        quizPlayMode: formData.typeJeu === 'QUIZ' ? formData.quizPlayMode : 'CLASSIC',
+        quizVariant: formData.typeJeu === 'QUIZ' ? formData.quizVariant : 'DEFAULT',
       });
+
+      if (isDataUrlCover && coverTrim) {
+        try {
+          const file = await dataUrlToImageFile(coverTrim);
+          if (file) {
+            await educatorApi.uploadGameCover(Number(id), file);
+          } else {
+            toast.warning('Jeu enregistré ; la nouvelle cover n’a pas pu être envoyée. Réessayez l’upload.');
+          }
+        } catch {
+          toast.warning('Jeu enregistré ; échec de l’envoi de la cover. Réessayez l’upload.');
+        }
+      }
       toast.success('Jeu mis à jour.');
       navigate('/educator/games/manage');
     } catch (err: unknown) {
@@ -257,7 +295,9 @@ export default function EducatorEditGame() {
       const res = await educatorApi.generateGameCover(Number(id));
       const next = res.data?.coverImageUrl ?? '';
       setFormData((prev) => ({ ...prev, coverImageUrl: next }));
-      toast.success('Cover IA générée avec succès');
+      setPreviewCoverSrc(next);
+      setCoverLoading(false);
+      toast.success('Cover générée (image intégrée au jeu)');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || (err as Error)?.message
@@ -388,7 +428,7 @@ export default function EducatorEditGame() {
                     <select value={formData.typeJeu} onChange={(e) => setFormData({ ...formData, typeJeu: e.target.value as TypeJeu })} className={inputClass}>
                       <option value="QUIZ">Quiz</option>
                       <option value="MEMOIRE">Memory</option>
-                      <option value="LOGIQUE">Logic</option>
+                      <option value="LOGIQUE">Logique</option>
                       <option value="REFLEXE">Reflex</option>
                     </select>
                   </div>
@@ -396,9 +436,22 @@ export default function EducatorEditGame() {
                     <label className={labelClass}>Mode de jeu *</label>
                     <select value={formData.modeJeu} onChange={(e) => setFormData({ ...formData, modeJeu: e.target.value as ModeJeu })} className={inputClass}>
                       <option value="INDIVIDUEL">Individuel</option>
-                      <option value="COLLECTIF">Collectif</option>
+                      <option value="EN_LIGNE">En ligne · chacun pour soi</option>
                     </select>
                   </div>
+                  {formData.typeJeu === 'QUIZ' && (
+                    <div>
+                      <label className={labelClass}>Mode de partie</label>
+                      <select
+                        value={formData.quizPlayMode}
+                        onChange={(e) => setFormData({ ...formData, quizPlayMode: e.target.value as QuizPlayMode })}
+                        className={inputClass}
+                      >
+                        <option value="CLASSIC">Classique</option>
+                        <option value="BLITZ_60S">Blitz 60 secondes</option>
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className={labelClass}>Difficulté (0–10) *</label>
                     <input type="number" value={formData.difficulte}
@@ -430,6 +483,16 @@ export default function EducatorEditGame() {
                     {errors.dureeMinutes && <p className="mt-1 text-sm text-red-600">{errors.dureeMinutes}</p>}
                   </div>
                 </div>
+
+                {formData.typeJeu === 'QUIZ' && (
+                  <section className="mb-8 mt-2">
+                    <QuizVariantPicker
+                      value={formData.quizVariant}
+                      onChange={(quizVariant) => setFormData((prev) => ({ ...prev, quizVariant }))}
+                      disabled={submitting}
+                    />
+                  </section>
+                )}
               </section>
 
               <section className="mb-8">
@@ -480,19 +543,29 @@ export default function EducatorEditGame() {
                     </button>
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={formData.coverImageUrl}
                     onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
                     className={inputClass}
-                    placeholder="https://..."
+                    placeholder="URL ou image intégrée (data URL) après génération"
                   />
                   {formData.coverImageUrl && (
-                    <img
-                      src={previewCoverSrc || formData.coverImageUrl}
-                      alt="Aperçu cover"
-                      className="w-full max-w-md h-44 object-cover rounded-xl border border-gray-200"
-                      onError={() => setPreviewCoverSrc(formData.coverImageUrl)}
-                    />
+                    <div className="relative w-full max-w-md h-44">
+                      {coverLoading && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 gap-2 z-10">
+                          <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                          <span className="text-xs text-gray-400">Génération de l'image…</span>
+                        </div>
+                      )}
+                      <img
+                        key={previewCoverSrc}
+                        src={previewCoverSrc || formData.coverImageUrl}
+                        alt="Aperçu cover"
+                        className="w-full h-44 object-cover rounded-xl border border-gray-200"
+                        onLoad={() => setCoverLoading(false)}
+                        onError={() => setCoverLoading(false)}
+                      />
+                    </div>
                   )}
                 </div>
               </section>

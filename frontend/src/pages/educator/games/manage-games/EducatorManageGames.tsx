@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Edit, Trash2, Loader2, Gamepad2, Eye, LayoutGrid, List } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO } from '@/api/types';

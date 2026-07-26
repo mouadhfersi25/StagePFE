@@ -1,7 +1,11 @@
 import { Client, type IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import userApi from '@/api/user/user.api';
-import type { RealtimeRoomPlayerDTO, RealtimeRoomStateDTO } from '@/api/types/api.types';
+import type {
+  RealtimeRoomPlayerDTO,
+  RealtimeRoomStateDTO,
+  CompetitiveRoomResultDTO,
+} from '@/api/types/api.types';
 import { ENV } from '@/config/env';
 
 export const MAX_ROOM_PLAYERS = 4;
@@ -18,18 +22,25 @@ export interface RoomPlayer {
 export interface Room {
   gameId: string;
   players: RoomPlayer[];
-  teamName?: string;
   createdAt: number;
   startedAt?: number;
 }
 
 export interface RoomStartResult {
   ok: boolean;
-  reason?: 'ROOM_NOT_FOUND' | 'STALE_ROOM' | 'HOST_ONLY' | 'NOT_ALL_READY' | 'ROOM_FULL' | 'INVALID_TEAM_NAME';
+  reason?:
+    | 'ROOM_NOT_FOUND'
+    | 'STALE_ROOM'
+    | 'HOST_ONLY'
+    | 'NOT_ALL_READY'
+    | 'ROOM_FULL'
+    | 'MIN_ONLINE_PLAYERS_REQUIRED'
+    | 'ROOM_ALREADY_STARTED';
 }
 
 let stompClient: Client | null = null;
 let activeSubscription: { roomCode: string; unsubscribe: () => void } | null = null;
+const resultSubscriptions = new Map<string, () => void>();
 
 function mapPlayer(p: RealtimeRoomPlayerDTO): RoomPlayer {
   return {
@@ -46,7 +57,6 @@ function mapRoom(dto: RealtimeRoomStateDTO): Room {
   return {
     gameId: String(dto.gameId),
     players: Array.isArray(dto.players) ? dto.players.map(mapPlayer) : [],
-    teamName: dto.teamName ?? undefined,
     createdAt: dto.createdAt,
     startedAt: dto.startedAt ?? undefined,
   };
@@ -66,7 +76,8 @@ function parseRoomError(err: unknown): RoomStartResult['reason'] {
   if (message.includes('ROOM_FULL')) return 'ROOM_FULL';
   if (message.includes('HOST_ONLY')) return 'HOST_ONLY';
   if (message.includes('NOT_ALL_READY')) return 'NOT_ALL_READY';
-  if (message.includes('INVALID_TEAM_NAME')) return 'INVALID_TEAM_NAME';
+  if (message.includes('MIN_ONLINE_PLAYERS_REQUIRED')) return 'MIN_ONLINE_PLAYERS_REQUIRED';
+  if (message.includes('ROOM_ALREADY_STARTED')) return 'ROOM_ALREADY_STARTED';
   if (message.includes('STALE_ROOM')) return 'STALE_ROOM';
   if (message.includes('ROOM_NOT_FOUND')) return 'ROOM_NOT_FOUND';
   return undefined;
@@ -74,12 +85,10 @@ function parseRoomError(err: unknown): RoomStartResult['reason'] {
 
 export async function createRoom(
   gameId: string,
-  _player: { id: string; name: string; avatar?: string; age?: number },
-  teamName?: string
+  _player: { id: string; name: string; avatar?: string; age?: number }
 ): Promise<string> {
   const response = await userApi.createRoom({
     gameId: Number(gameId),
-    teamName: teamName?.trim() || undefined,
   });
   return String(response.data.roomCode);
 }
@@ -103,19 +112,6 @@ export async function joinRoom(
     return mapRoom(response.data);
   } catch {
     return null;
-  }
-}
-
-export async function updateRoomTeamName(
-  code: string,
-  _requesterId: string,
-  teamName: string
-): Promise<RoomStartResult> {
-  try {
-    await userApi.updateRoomTeamName(code.toUpperCase(), teamName);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: parseRoomError(err) || 'INVALID_TEAM_NAME' };
   }
 }
 
@@ -198,6 +194,65 @@ export function subscribeRoom(
       activeSubscription.unsubscribe();
       activeSubscription = null;
     }
+  };
+}
+
+/** Synchronise le classement de la room pendant que les adversaires terminent. */
+export function subscribeCompetitiveResult(
+  roomCode: string,
+  onResult: (result: CompetitiveRoomResultDTO) => void,
+  onError?: (error: string) => void
+): () => void {
+  let disposed = false;
+  const normalizedRoomCode = roomCode.trim().toUpperCase();
+  const token = localStorage.getItem('jwt_token');
+  if (!token || !normalizedRoomCode) {
+    onError?.('Missing room or auth token');
+    return () => {};
+  }
+
+  const wsBase = resolveWsBaseUrl();
+  if (!stompClient || !stompClient.active) {
+    stompClient = new Client({
+      reconnectDelay: 2500,
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      webSocketFactory: () => new SockJS(`${wsBase}/ws`),
+      debug: () => undefined,
+      onStompError: (frame) => onError?.(frame.body || 'WebSocket STOMP error'),
+    });
+    stompClient.activate();
+  }
+
+  const subscribeNow = () => {
+    if (disposed || !stompClient || resultSubscriptions.has(normalizedRoomCode)) return;
+    const subscription = stompClient.subscribe(
+      `/topic/rooms/${normalizedRoomCode}/results`,
+      (message: IMessage) => {
+        try {
+          onResult(JSON.parse(message.body) as CompetitiveRoomResultDTO);
+        } catch {
+          onError?.('Invalid competitive result payload');
+        }
+      }
+    );
+    resultSubscriptions.set(normalizedRoomCode, () => subscription.unsubscribe());
+  };
+
+  if (stompClient.connected) {
+    subscribeNow();
+  } else {
+    const previousOnConnect = stompClient.onConnect;
+    stompClient.onConnect = (frame) => {
+      previousOnConnect?.(frame);
+      subscribeNow();
+    };
+  }
+
+  return () => {
+    disposed = true;
+    const unsubscribe = resultSubscriptions.get(normalizedRoomCode);
+    unsubscribe?.();
+    resultSubscriptions.delete(normalizedRoomCode);
   };
 }
 

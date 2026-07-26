@@ -6,42 +6,41 @@
 // ----- Auth (POST /api/auth/*) -----
 
 /** POST /api/auth/login - body */
-export interface AuthRequest {
+interface AuthRequest {
   email: string;
   password: string;
 }
 
 /** POST /api/auth/login - response */
-export interface AuthResponse {
+interface AuthResponse {
   token: string;
   role: string;
   email: string;
 }
 
 /** POST /api/auth/register - body (RegisterRequest backend) */
-export interface RegisterRequest {
+interface RegisterRequest {
   nom: string;
   prenom: string;
   email: string;
   password: string;
   dateDeNaissance: string; // ISO date (YYYY-MM-DD)
   telephone?: string;
-  avatarUrl?: string;
 }
 
 /** POST /api/auth/forgot-password - body */
-export interface ForgotPasswordRequest {
+interface ForgotPasswordRequest {
   email: string;
 }
 
 /** POST /api/auth/reset-password - body */
-export interface ResetPasswordRequest {
+interface ResetPasswordRequest {
   token: string;
   newPassword: string;
 }
 
 /** Réponses message seul (register, verify, forgot, reset, logout) */
-export interface MessageResponse {
+interface MessageResponse {
   message: string;
 }
 
@@ -77,6 +76,34 @@ export interface UserDTO {
   dateExpirationToken: string | null;
   dateDerniereConnexion: string | null;
   dateCreation: string | null;
+  /** Joueur : id du compte PARENT rattaché (défini par l’admin). */
+  idParent?: number | null;
+}
+
+/** PUT /api/admin/users/{id}/parent-link */
+export interface SetParentLinkRequest {
+  parentId: number | null;
+}
+
+/** GET /api/users/me/linked-children — profil enfant pour un compte PARENT */
+export interface LinkedChildProfileDTO {
+  id: number;
+  nom: string;
+  prenom: string;
+  email: string;
+  dateDeNaissance: string;
+  avatarUrl: string | null;
+  niveau: number | null;
+  scoreTotal: number | null;
+  pointsExperience: number | null;
+  xpToNextLevel: number | null;
+  currentStreakDays: number | null;
+  bestStreakDays: number | null;
+  skillMath: number | null;
+  skillLogic: number | null;
+  skillMemory: number | null;
+  skillReflex: number | null;
+  onboardingCompleted: boolean;
 }
 
 /** PUT /api/users/update-profile - body */
@@ -89,7 +116,7 @@ export interface UpdateProfileRequest {
 }
 
 /** PUT /api/users/change-password - body */
-export interface ChangePasswordRequest {
+interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
 }
@@ -103,9 +130,8 @@ export interface PlayerOnboardingRequest {
 
 export interface CreateGameSessionRequest {
   gameId: number;
-  modeJeu?: 'INDIVIDUEL' | 'COLLECTIF' | string;
+  modeJeu?: 'INDIVIDUEL' | 'EN_LIGNE' | string;
   roomCode?: string;
-  teamName?: string;
   scoreGlobal?: number;
   niveauAtteint?: number;
   etatSession?: 'EN_COURS' | 'TERMINE' | 'ABANDONNE' | string;
@@ -131,13 +157,48 @@ export interface SoloLeaderboardEntryDTO {
   totalScore: number;
 }
 
-export interface TeamLeaderboardEntryDTO {
-  teamName: string;
+export type LeaderboardScope = 'GLOBAL' | 'COUNTRY' | 'REGION';
+
+export interface SoloLeaderboardResponseDTO {
+  scope: LeaderboardScope;
+  scopeLabel: string;
+  entries: SoloLeaderboardEntryDTO[];
+  currentUserRank: number | null;
+  currentUserId: number;
+  totalPlayers: number;
+}
+
+export interface PlayerLeaderboardRanksDTO {
+  globalRank: number;
+  globalTotal: number;
+  countryRankingAvailable: boolean;
+  countryRank: number | null;
+  countryTotal: number;
+  paysId: number | null;
+  paysNom: string | null;
+  regionRankingAvailable: boolean;
+  regionRank: number | null;
+  regionTotal: number;
+  regionId: number | null;
+  regionNom: string | null;
+}
+
+export interface CompetitiveRoomPlayerResultDTO {
+  playerId: number;
+  playerName: string;
+  submitted: boolean;
+  score?: number | null;
+  outcome: 'PENDING' | 'WINNER' | 'LOSER' | 'DRAW';
+}
+
+export interface CompetitiveRoomResultDTO {
   roomCode: string;
-  sessionsCount: number;
-  playersCount: number;
-  averageScore: number;
-  totalScore: number;
+  gameId: number;
+  expectedPlayers: number;
+  completedPlayers: number;
+  highestScore?: number | null;
+  complete: boolean;
+  players: CompetitiveRoomPlayerResultDTO[];
 }
 
 export interface PlayerBadgeOverviewItemDTO {
@@ -190,18 +251,18 @@ export interface PlayerHistorySessionDTO {
   niveauAtteint?: number | null;
   reussite: boolean;
   statut: 'EN_COURS' | 'TERMINEE' | 'ABANDONNEE' | string;
-  mode: 'Individual' | 'Collective' | string;
+  mode: 'Individual' | 'Online' | string;
   accuracy?: number | null;
   reactionTime?: number | null;
 }
 
-export interface PlayerProgressPointDTO {
+interface PlayerProgressPointDTO {
   week: string;
   xp: number;
   score: number;
 }
 
-export interface PlayerGameTypePerformanceDTO {
+interface PlayerGameTypePerformanceDTO {
   type: string;
   played: number;
   avgScore: number;
@@ -233,7 +294,6 @@ export interface RealtimeRoomPlayerDTO {
 export interface RealtimeRoomStateDTO {
   roomCode: string;
   gameId: number;
-  teamName?: string | null;
   maxPlayers: number;
   createdAt: number;
   startedAt?: number | null;
@@ -243,11 +303,54 @@ export interface RealtimeRoomStateDTO {
 
 export interface CreateRoomRequest {
   gameId: number;
-  teamName?: string;
 }
 
 export interface JoinRoomRequest {
   roomCode: string;
+}
+
+export type MotifReclamation =
+  | 'CONTENU_INADAPTE_AGE'
+  | 'ERREUR_REPONSE'
+  | 'IMAGE_TEXTE_CHOQUANT'
+  | 'TROP_DIFFICILE'
+  | 'BUG_TECHNIQUE'
+  | 'AUTRE';
+
+export type StatutReclamation = 'OUVERT' | 'TRAITE' | 'REJETE';
+
+export interface CreateReclamationRequest {
+  sessionId: number;
+  gameId: number;
+  motif: MotifReclamation;
+  commentaire?: string;
+}
+
+export interface ReclamationDTO {
+  id: number;
+  gameId: number;
+  gameTitle: string;
+  gameType: string;
+  sessionId: number;
+  playerId: number;
+  playerPrenom: string;
+  playerNom: string;
+  playerEmail: string;
+  motif: MotifReclamation;
+  commentaire: string | null;
+  statut: StatutReclamation;
+  reponseAdmin: string | null;
+  adminId: number | null;
+  adminPrenom: string | null;
+  adminNom: string | null;
+  traitee: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface UpdateReclamationRequest {
+  statut?: StatutReclamation;
+  reponseAdmin?: string;
 }
 
 export interface CreateGameSessionResponse {
@@ -255,6 +358,7 @@ export interface CreateGameSessionResponse {
   scoreGlobal: number;
   scoreBase?: number;
   scoreFinal?: number;
+  scoreMaxPossible?: number;
   aiAdjustment?: number;
   totalScore: number;
   xpGained: number;
@@ -271,6 +375,7 @@ export interface CreateGameSessionResponse {
   anomalyNotes?: string;
   adjustmentSource?: string;
   explanationCode?: string;
+  roomResult?: CompetitiveRoomResultDTO | null;
   message: string;
 }
 
@@ -286,6 +391,45 @@ export interface AdminScoringDistributionDTO {
   totalXp: number;
   avgAdjustmentDelta?: number;
   anomalySessions?: number;
+}
+
+export interface AdminDaySessionCountDTO {
+  day: string;
+  date: string;
+  sessions: number;
+}
+
+export interface AdminRecentActivityDTO {
+  id: string;
+  player: string;
+  action: string;
+  game: string;
+  occurredAt: string;
+}
+
+interface AdminGamePerformanceDTO {
+  name: string;
+  plays: number;
+  avgScore: number;
+  completion: number;
+}
+
+interface AdminAgeGroupStatDTO {
+  age: string;
+  avgScore: number;
+  players: number;
+}
+
+interface AdminGlobalMetricsDTO {
+  overallCompletionRatePercent: number;
+  activePlayers: number;
+  avgPlaytimeMinutesPerUser: number;
+}
+
+export interface AdminStatisticsOverviewDTO {
+  gamePerformance: AdminGamePerformanceDTO[];
+  ageGroups: AdminAgeGroupStatDTO[];
+  metrics: AdminGlobalMetricsDTO;
 }
 
 export interface SponsorPubliciteDTO {
@@ -337,7 +481,7 @@ export interface SponsorRewardRequestDTO {
   requestedDate?: string | null;
 }
 
-export interface CreatePubliciteInteractionRequest {
+interface CreatePubliciteInteractionRequest {
   typeInteraction: 'VIEW' | 'CLICK' | string;
 }
 
@@ -346,8 +490,20 @@ export interface CreatePubliciteInteractionRequest {
 /** Valeurs possibles pour typeJeu (backend enum TypeJeu) */
 export type TypeJeu = 'QUIZ' | 'MEMOIRE' | 'REFLEXE' | 'LOGIQUE';
 
+export type QuizPlayMode = 'CLASSIC' | 'BLITZ_60S';
+
+export type QuizVariant =
+  | 'DEFAULT'
+  | 'TRUE_FALSE'
+  | 'CLOZE'
+  | 'IMAGE_WORD'
+  | 'SYNONYM_ANTONYM'
+  | 'COLOR_TRANSLATION'
+  | 'AUDIO_COLOR';
+
+
 /** Valeurs possibles pour modeJeu (backend enum ModeJeu) */
-export type ModeJeu = 'INDIVIDUEL' | 'COLLECTIF';
+export type ModeJeu = 'INDIVIDUEL' | 'EN_LIGNE';
 
 /** Valeurs possibles pour l'état du jeu (backend enum EtatJeu) */
 export type EtatJeu = 'BROUILLON' | 'EN_ATTENTE' | 'ACCEPTE' | 'REFUSE';
@@ -365,6 +521,8 @@ export interface CreateGameRequest {
   icone?: string;
   coverImageUrl?: string;
   actif?: boolean;
+  quizPlayMode?: QuizPlayMode;
+  quizVariant?: QuizVariant;
 }
 
 /** PUT /api/admin/games/:id - body (champs optionnels) */
@@ -380,6 +538,8 @@ export interface UpdateGameRequest {
   icone?: string;
   coverImageUrl?: string;
   actif?: boolean;
+  quizPlayMode?: QuizPlayMode;
+  quizVariant?: QuizVariant;
 }
 
 /** POST /api/admin/games - response (GET /api/admin/games, GET /api/admin/games/:id) */
@@ -392,6 +552,8 @@ export interface GameDTO {
   ageMax: number | null;
   typeJeu: TypeJeu;
   modeJeu: ModeJeu;
+  quizPlayMode?: QuizPlayMode | null;
+  quizVariant?: QuizVariant | null;
   actif: boolean;
   dureeMinutes: number | null;
   icone: string | null;
@@ -478,6 +640,9 @@ export interface QuizQuestionDTO {
   contenu: string;
   bonneReponse: string;
   options: string[] | null;
+  sousType?: 'DEFAULT' | 'TRUE_FALSE' | 'CLOZE' | 'IMAGE_WORD' | 'SYNONYM_ANTONYM' | 'COLOR_TRANSLATION' | 'AUDIO_COLOR' | string | null;
+  mediaUrl?: string | null;
+  promptAudioUrl?: string | null;
   explication: string | null;
   difficulte: number | null;
 }
@@ -488,6 +653,9 @@ export interface CreateQuizQuestionRequest {
   contenu: string;
   bonneReponse: string;
   options?: string[];
+  sousType?: 'DEFAULT' | 'TRUE_FALSE' | 'CLOZE' | 'IMAGE_WORD' | 'SYNONYM_ANTONYM' | 'COLOR_TRANSLATION' | 'AUDIO_COLOR' | string;
+  mediaUrl?: string;
+  promptAudioUrl?: string;
   explication?: string;
   difficulte?: number;
 }
@@ -497,6 +665,9 @@ export interface UpdateQuizQuestionRequest {
   contenu?: string;
   bonneReponse?: string;
   options?: string[];
+  sousType?: 'DEFAULT' | 'TRUE_FALSE' | 'CLOZE' | 'IMAGE_WORD' | 'SYNONYM_ANTONYM' | 'COLOR_TRANSLATION' | 'AUDIO_COLOR' | string;
+  mediaUrl?: string;
+  promptAudioUrl?: string;
   explication?: string;
   difficulte?: number;
 }
@@ -506,12 +677,13 @@ export interface GenerateQuizPreviewRequest {
   count?: number;
 }
 
-export type LogicPuzzleType = 'SUITE_LOGIQUE' | 'INTRUS' | 'DEDUCTION' | string;
+type LogicPuzzleType = 'SUITE_LOGIQUE' | 'INTRUS' | 'DEDUCTION' | 'COLOR_MATCH' | string;
 
 export interface LogicPuzzleData {
   type?: LogicPuzzleType;
   sequence?: Array<string | number>;
   options?: string[];
+  colorPairs?: Array<{ color: string; word: string }>;
 }
 
 export interface LogicPuzzleDTO {
@@ -552,7 +724,7 @@ export interface ReflexSettingsDTO {
   nombreRounds: number;
   tempsReactionMaxMs: number | null;
   typeStimuli: string | null;
-  modeleReflexe: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | string;
+  modeleReflexe: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | 'STROOP_INVERSE' | string;
   noGoRatio: number | null;
   choiceTargetCount: number | null;
   difficulte: number | null;
@@ -563,14 +735,10 @@ export interface CreateOrUpdateReflexSettingsRequest {
   nombreRounds: number;
   tempsReactionMaxMs?: number;
   typeStimuli?: string;
-  modeleReflexe?: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | string;
-  noGoRatio?: number;
-  choiceTargetCount?: number;
+  modeleReflexe?: 'CLASSIC' | 'GO_NO_GO' | 'CHOICE_REACTION' | 'STROOP_INVERSE' | string;
+  noGoRatio?: number | null;
+  choiceTargetCount?: number | null;
   difficulte?: number;
-}
-
-export interface GenerateReflexSettingsPreviewRequest {
-  gameId: number;
 }
 
 // ----- Educator Memory (GET/POST/PUT/DELETE /api/educator/memory-cards) -----
@@ -581,6 +749,9 @@ export interface MemoryCardDTO {
   jeuId: number;
   jeuTitre: string;
   symbole: string;
+  cardType?: 'EMOJI' | 'TEXT' | 'IMAGE' | 'COLOR' | string | null;
+  cardValue?: string | null;
+  sousType?: 'DEFAULT' | 'IMAGE_WORD_PAIR' | 'COLOR_WORD_PAIR' | 'BILINGUAL_WORD_PAIR' | string | null;
   pairKey: string | null;
   categorie: string | null;
 }
@@ -589,6 +760,9 @@ export interface MemoryCardDTO {
 export interface CreateMemoryCardRequest {
   jeuId: number;
   symbole: string;
+  cardType?: 'EMOJI' | 'TEXT' | 'IMAGE' | 'COLOR' | string;
+  cardValue?: string | null;
+  sousType?: 'DEFAULT' | 'IMAGE_WORD_PAIR' | 'COLOR_WORD_PAIR' | 'BILINGUAL_WORD_PAIR' | string;
   pairKey?: string | null;
   categorie?: string | null;
 }
@@ -596,6 +770,9 @@ export interface CreateMemoryCardRequest {
 /** PUT /api/educator/memory-cards/:id - body. */
 export interface UpdateMemoryCardRequest {
   symbole?: string;
+  cardType?: 'EMOJI' | 'TEXT' | 'IMAGE' | 'COLOR' | string;
+  cardValue?: string | null;
+  sousType?: 'DEFAULT' | 'IMAGE_WORD_PAIR' | 'COLOR_WORD_PAIR' | 'BILINGUAL_WORD_PAIR' | string;
   pairKey?: string | null;
   categorie?: string | null;
 }
@@ -608,4 +785,19 @@ export interface EducatorDashboardStatsDTO {
   avgSuccessRate: number;
   studentActivity: number;
   difficultyDistribution: { name: string; value: number; color: string }[];
+}
+
+export interface EducatorGameTypeStatsDTO {
+  gameType: string;
+  label: string;
+  sessions: number;
+  avgSuccessRate: number;
+  color: string;
+}
+
+export interface EducatorLearningStatsDTO {
+  avgSuccessRate: number;
+  totalAnswers: number;
+  improvementPercent: number;
+  sessionsByGameType: EducatorGameTypeStatsDTO[];
 }

@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router';
+import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Users, Check, Clock, Copy, Link2 } from 'lucide-react';
 import { useAuth } from '@/context';
 import { useAdminData } from '@/context';
 import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
+import { PlayerQuizVariantChip } from '@/components/player/PlayerQuizVariant';
 import {
   getRoom,
   joinRoom,
   setPlayerReady,
   setRoomStarted,
-  updateRoomTeamName,
   subscribeRoom,
   getShareLink,
   MAX_ROOM_PLAYERS,
@@ -27,11 +27,21 @@ export default function WaitingRoom() {
   const { playerProfile } = useAuth();
   const { games } = useAdminData();
 
-  const { game: gameFromState, mode, roomCode: roomCodeFromState } = (location.state || {}) as {
-    game?: { id: string; title: string; description: string; icon: string; type: string; estimatedTime: string; durationMinutes?: number; modeJeu?: 'INDIVIDUEL' | 'COLLECTIF' };
+  const { game: gameFromState, roomCode: roomCodeFromState } = (location.state || {}) as {
+    game?: {
+      id: string;
+      title: string;
+      description: string;
+      icon: string;
+      type: string;
+      estimatedTime: string;
+      durationMinutes?: number;
+      modeJeu?: 'INDIVIDUEL' | 'EN_LIGNE';
+      quizVariant?: string;
+      quizPlayMode?: string;
+    };
     mode?: string;
     roomCode?: string;
-    teamName?: string;
   };
 
   const roomCodeFromUrl = searchParams.get('room')?.toUpperCase() || roomCodeFromState;
@@ -39,13 +49,13 @@ export default function WaitingRoom() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [teamNameInput, setTeamNameInput] = useState('');
 
   const currentPlayerId = String(playerProfile?.id ?? 'guest');
   const currentPlayerName = playerProfile?.name ?? 'Joueur';
   const isHost = room?.players.some((p) => p.id === currentPlayerId && p.isHost) ?? false;
   const myPlayer = room?.players.find((p) => p.id === currentPlayerId);
   const allReady = (room?.players.length && room.players.every((p) => p.ready)) ?? false;
+  const hasEnoughPlayers = (room?.players.length ?? 0) >= 2;
 
   const refreshRoom = async () => {
     if (!roomCodeFromUrl) return;
@@ -60,7 +70,7 @@ export default function WaitingRoom() {
       const r = await getRoom(roomCodeFromUrl);
       if (!r) {
         toast.error('Room introuvable');
-        navigate('/player/new-game', { state: { mode: 'Collective' } });
+        navigate('/player/new-game', { state: { mode: 'Online' } });
         return;
       }
       const joinedRoom = await joinRoom(roomCodeFromUrl, {
@@ -71,7 +81,7 @@ export default function WaitingRoom() {
       });
       if (!joinedRoom) {
         toast.error(`Room complète (${MAX_ROOM_PLAYERS} joueurs max)`);
-        navigate('/player/new-game', { state: { mode: 'Collective' } });
+        navigate('/player/new-game', { state: { mode: 'Online' } });
         return;
       }
       if (!cancelled) setRoom(joinedRoom);
@@ -116,16 +126,11 @@ export default function WaitingRoom() {
     navigate(`/player/game/${game.type}/${gameId}`, {
       state: {
         game,
-        mode,
+        mode: 'Online',
         roomCode: roomCodeFromUrl,
-        teamName: room?.teamName,
       },
     });
-  }, [countdown, game, gameId, mode, roomCodeFromUrl, room?.teamName, navigate]);
-
-  useEffect(() => {
-    setTeamNameInput(room?.teamName ?? '');
-  }, [room?.teamName]);
+  }, [countdown, game, gameId, roomCodeFromUrl, navigate]);
 
   const handleReady = async () => {
     if (!roomCodeFromUrl) return;
@@ -138,22 +143,12 @@ export default function WaitingRoom() {
     const result = await setRoomStarted(roomCodeFromUrl, currentPlayerId);
     if (!result.ok) {
       if (result.reason === 'NOT_ALL_READY') toast.error("Tous les joueurs doivent être prêts");
+      else if (result.reason === 'MIN_ONLINE_PLAYERS_REQUIRED') toast.error("Il faut au moins 2 adversaires pour lancer la partie");
       else if (result.reason === 'HOST_ONLY') toast.error("Seul l'hôte peut démarrer");
       else toast.error("Room invalide ou expirée");
       return;
     }
     setCountdown(3);
-    await refreshRoom();
-  };
-
-  const handleTeamNameSave = async () => {
-    if (!roomCodeFromUrl || !isHost) return;
-    const result = await updateRoomTeamName(roomCodeFromUrl, currentPlayerId, teamNameInput);
-    if (!result.ok) {
-      toast.error("Nom d'équipe invalide (2-60 caractères)");
-      return;
-    }
-    toast.success("Nom d'équipe mis à jour");
     await refreshRoom();
   };
 
@@ -184,7 +179,7 @@ export default function WaitingRoom() {
             </motion.button>
             <div>
               <h1 className="text-2xl font-bold text-white">Salle d’attente</h1>
-              <p className="text-sm text-slate-300">Mode équipe — {game.title}</p>
+              <p className="text-sm text-slate-300">Solo en ligne · contre adversaires — {game.title}</p>
             </div>
           </div>
           <PlayerHeaderActions />
@@ -235,7 +230,7 @@ export default function WaitingRoom() {
               </motion.button>
             </div>
             <p className="text-sm text-slate-300 mt-2">
-              Envoie ce code ou le lien à tes coéquipiers pour qu’ils rejoignent la room.
+              Envoie ce code ou le lien à tes adversaires pour qu’ils rejoignent la room.
             </p>
           </motion.div>
         )}
@@ -251,7 +246,12 @@ export default function WaitingRoom() {
               {game.icon}
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold text-white mb-1">{game.title}</h2>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h2 className="text-2xl font-bold text-white">{game.title}</h2>
+                {game.type === 'quiz' && (
+                  <PlayerQuizVariantChip variant={game.quizVariant ?? 'DEFAULT'} />
+                )}
+              </div>
               <p className="text-slate-300">{game.description}</p>
             </div>
             <div className="text-right">
@@ -265,31 +265,9 @@ export default function WaitingRoom() {
               </div>
             </div>
           </div>
-          <div className="mt-4 border-t border-white/15 pt-4">
-            <p className="text-sm text-slate-300 mb-2">Nom de l'équipe</p>
-            <div className="flex gap-2">
-              <input
-                value={teamNameInput}
-                onChange={(e) => setTeamNameInput(e.target.value)}
-                disabled={!isHost}
-                placeholder="Ex: Les Champions"
-                className="flex-1 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white disabled:opacity-60"
-                maxLength={60}
-              />
-              {isHost ? (
-                <button
-                  type="button"
-                  onClick={handleTeamNameSave}
-                  className="px-4 py-2 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-500"
-                >
-                  Enregistrer
-                </button>
-              ) : null}
-            </div>
-          </div>
         </motion.div>
 
-        {/* Team Members */}
+        {/* Adversaires */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -366,7 +344,7 @@ export default function WaitingRoom() {
               <Check className="w-6 h-6" />
               Je suis prêt !
             </motion.button>
-          ) : allReady && isHost ? (
+          ) : allReady && hasEnoughPlayers && isHost ? (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -383,7 +361,11 @@ export default function WaitingRoom() {
               >
                 <Clock className="w-6 h-6" />
               </motion.div>
-              {isHost ? 'En attente que tout le monde soit prêt...' : 'En attente du démarrage par l’hôte...'}
+              {!hasEnoughPlayers
+                ? 'En attente d’un adversaire…'
+                : isHost
+                  ? 'En attente que tout le monde soit prêt...'
+                  : 'En attente du démarrage par l’hôte...'}
             </div>
           )}
         </motion.div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Calendar, Trophy, Target, Zap, Mail, Phone, Loader2, User, Contact, Activity, Ban, UserCheck } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { ArrowLeft, Calendar, Trophy, Target, Zap, Mail, Phone, Loader2, User, Contact, Activity, Ban, UserCheck, Link2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context';
 import type { UserDTO } from '@/data/types';
 import adminApi from '@/api/admin';
@@ -32,6 +32,9 @@ export default function PlayerDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [parentLinkLoading, setParentLinkLoading] = useState(false);
+  const [parentAccounts, setParentAccounts] = useState<UserDTO[]>([]);
+  const [selectedParentId, setSelectedParentId] = useState<string>('');
 
   const isCurrentUser = user && currentUser?.email && user.email?.toLowerCase() === currentUser.email.toLowerCase();
   const canSuspendOrReactivate = user && !isCurrentUser;
@@ -56,6 +59,51 @@ export default function PlayerDetail() {
       .then((res) => setUser(res.data))
       .catch((err) => setError(err.response?.data?.message || err.message || 'Erreur lors de la réactivation'))
       .finally(() => setActionLoading(false));
+  };
+
+  useEffect(() => {
+    if (user?.idParent != null) setSelectedParentId(String(user.idParent));
+    else setSelectedParentId('');
+  }, [user?.id, user?.idParent]);
+
+  useEffect(() => {
+    if (!user || user.role?.toUpperCase() !== 'JOUEUR') {
+      setParentAccounts([]);
+      return;
+    }
+    let cancelled = false;
+    adminApi
+      .getUsers()
+      .then((res) => {
+        if (cancelled || !Array.isArray(res.data)) return;
+        const parents = (res.data as UserDTO[]).filter((u) => u.role?.toUpperCase() === 'PARENT');
+        setParentAccounts(parents);
+      })
+      .catch(() => {
+        if (!cancelled) setParentAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role]);
+
+  const handleSaveParentLink = () => {
+    if (!user || user.role?.toUpperCase() !== 'JOUEUR') return;
+    const parentId = selectedParentId === '' ? null : Number(selectedParentId);
+    if (parentId !== null && Number.isNaN(parentId)) {
+      setError('Identifiant parent invalide');
+      return;
+    }
+    setParentLinkLoading(true);
+    setError(null);
+    adminApi
+      .setUserParentLink(user.id, { parentId })
+      .then((res) => {
+        setUser(res.data);
+        setSelectedParentId(res.data.idParent != null ? String(res.data.idParent) : '');
+      })
+      .catch((err) => setError(err.response?.data?.message || err.message || 'Erreur lors du rattachement'))
+      .finally(() => setParentLinkLoading(false));
   };
 
   useEffect(() => {
@@ -339,6 +387,64 @@ export default function PlayerDetail() {
               </div>
             </motion.div>
           </div>
+
+          {user.role?.toUpperCase() === 'JOUEUR' && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-white rounded-2xl shadow-sm border border-teal-100 overflow-hidden"
+            >
+              <div className="px-5 py-4 bg-gradient-to-br from-teal-50 to-cyan-50 border-b border-teal-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
+                    <Link2 className="w-5 h-5 text-teal-700" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Rattachement parent</h3>
+                    <p className="text-xs text-gray-500">Compte tuteur (rôle PARENT) pour l’espace parent</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5 flex flex-col sm:flex-row sm:items-end gap-4">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Parent</label>
+                  <select
+                    value={selectedParentId}
+                    onChange={(e) => setSelectedParentId(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm"
+                  >
+                    <option value="">— Aucun parent —</option>
+                    {parentAccounts.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.prenom} {p.nom} · {p.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {user.idParent != null && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/players/${user.idParent}`)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-800 text-sm font-medium hover:bg-teal-100"
+                    >
+                      Fiche parent
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveParentLink}
+                    disabled={parentLinkLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {parentLinkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Enregistrer le lien
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import type { GameDTO, UpdateGameRequest, TypeJeu, ModeJeu } from '@/api/types';
@@ -276,7 +276,7 @@ export default function EditGame() {
                   className={inputClass}
                 >
                   <option value="INDIVIDUEL">Individuel</option>
-                  <option value="COLLECTIF">Collectif</option>
+                  <option value="EN_LIGNE">En ligne · chacun pour soi</option>
                 </select>
               </div>
               <div>

@@ -17,6 +17,9 @@ public class UpdateQuizQuestionRequest {
     private String contenu;
     private String bonneReponse;
     private java.util.List<String> options;
+    private String sousType;
+    private String mediaUrl;
+    private String promptAudioUrl;
     private String explication;
     private Integer difficulte;
 }

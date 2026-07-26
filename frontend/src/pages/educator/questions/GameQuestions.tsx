@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Plus, Edit, Trash2, Eye, WandSparkles, Loader2, CheckSquare, Square } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO, QuizQuestionDTO } from '@/api/types/api.types';
+import { QuizVariantBadge } from '@/components/educator/QuizVariantPicker';
+import { getQuizVariantMeta } from '@/constants/quizVariants';
 
 function difficultyLabel(d: number | null): string {
   return d === 1 ? 'Easy' : d === 2 ? 'Medium' : d === 3 ? 'Hard' : 'Medium';
@@ -114,6 +116,8 @@ export default function GameQuestions() {
             contenu: q.contenu,
             bonneReponse: q.bonneReponse,
             options: q.options ?? undefined,
+            mediaUrl: q.mediaUrl ?? undefined,
+            promptAudioUrl: q.promptAudioUrl ?? undefined,
             explication: q.explication ?? undefined,
             difficulte: q.difficulte ?? game.difficulte ?? undefined,
           })
@@ -179,6 +183,7 @@ export default function GameQuestions() {
               <h1 className="text-3xl font-bold text-gray-900">{canEdit ? 'Gérer les questions' : 'Questions (lecture seule)'}</h1>
               <p className="text-gray-600 mt-1">
                 <span className="font-medium text-gray-800">{game.titre}</span>
+                <QuizVariantBadge variant={game.quizVariant} />
                 {canEdit ? ' — ajoutez, modifiez ou supprimez des questions.' : ' — ce jeu est finalisé : vous ne pouvez plus modifier le contenu.'}
               </p>
             </div>
@@ -224,10 +229,12 @@ export default function GameQuestions() {
                 <div>
                   <h3 className="text-base font-semibold text-emerald-900">Assistant IA - Génération de questions</h3>
                   <p className="text-sm text-emerald-800/90">
-                    Génération précise selon le titre, la description, la difficulté, l'âge et la durée du quiz.
+                    Génération pour la variante{' '}
+                    <span className="font-semibold">{getQuizVariantMeta(game.quizVariant).label}</span>
+                    {' '}selon le titre, la description, la difficulté, l&apos;âge et la durée du quiz.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="text-sm text-gray-700">Nombre</label>
                   <input
                     type="number"
@@ -293,6 +300,9 @@ export default function GameQuestions() {
                             </div>
                             <div>
                               <p className="font-medium text-slate-900">{q.contenu}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {q.mediaUrl ? 'Image incluse' : ''}
+                              </p>
                               {q.options && q.options.length > 0 && (
                                 <p className="text-xs text-slate-600 mt-1">Options: {q.options.join(' | ')}</p>
                               )}

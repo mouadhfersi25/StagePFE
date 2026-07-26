@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import type { Game, Badge, QuizQuestion, AdminQuestion } from '@/data/types';
 
-export interface LogicPuzzle {
+interface LogicPuzzle {
   id: number;
   question: string;
   pattern: number[];
@@ -9,7 +9,7 @@ export interface LogicPuzzle {
   hint: string;
 }
 
-export type GameConfig =
+type GameConfig =
   | { type: 'quiz'; questions: QuizQuestion[] }
   | { type: 'memory'; pairs: string[] }
   | { type: 'logic'; puzzles: LogicPuzzle[] }

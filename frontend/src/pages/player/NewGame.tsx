@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Play, Clock, Users, User as UserIcon, Filter, LogIn } from 'lucide-react';
 import { useAuth } from '@/context';
 import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
@@ -8,18 +8,20 @@ import { joinRoom, getRoom, MAX_ROOM_PLAYERS } from '@/services/roomService';
 import type { Game } from '@/data/types';
 import userApi from '@/api/user/user.api';
 import type { GameDTO } from '@/api/types';
+import { getQuizVariantMeta } from '@/constants/quizVariants';
+import { PlayerQuizVariantChip } from '@/components/player/PlayerQuizVariant';
 import { launchPlayerGame } from './utils/launchPlayerGame';
 
 export default function NewGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { playerProfile } = useAuth();
-  const modeFromState = (location.state as { mode?: 'Individual' | 'Collective' } | null)?.mode;
+  const modeFromState = (location.state as { mode?: 'Individual' | 'Online' } | null)?.mode;
 
   const [selectedAge, setSelectedAge] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedMode, setSelectedMode] = useState<'Individual' | 'Collective'>(modeFromState ?? 'Individual');
+  const [selectedMode, setSelectedMode] = useState<'Individual' | 'Online'>(modeFromState ?? 'Individual');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [games, setGames] = useState<Game[]>([]);
@@ -48,6 +50,8 @@ export default function NewGame() {
     difficulty: mapDifficulty(g.difficulte),
     estimatedTime: `${g.dureeMinutes ?? 10} min`,
     durationMinutes: g.dureeMinutes ?? 10,
+    quizPlayMode: g.quizPlayMode ?? 'CLASSIC',
+    quizVariant: g.quizVariant ?? 'DEFAULT',
     icon: g.icone || (g.typeJeu === 'QUIZ' ? '🧮' : g.typeJeu === 'MEMOIRE' ? '🧠' : g.typeJeu === 'LOGIQUE' ? '🎯' : '⚡'),
     coverImageUrl: g.coverImageUrl || undefined,
     active: g.actif,
@@ -135,11 +139,13 @@ export default function NewGame() {
       return;
     }
     navigate(`/player/waiting-room/${room.gameId}?room=${code}`, {
-      state: { game, mode: 'Collective' as const, roomCode: code, teamName: joinedRoom.teamName },
+      state: { game, mode: 'Online' as const, roomCode: code },
     });
   };
 
   const filteredGames = games.filter((game) => {
+    if (selectedMode === 'Online' && game.modeJeu !== 'EN_LIGNE') return false;
+    if (selectedMode === 'Individual' && game.modeJeu !== 'INDIVIDUEL') return false;
     if (selectedType !== 'all' && game.type !== selectedType) return false;
     if (selectedDifficulty !== 'all' && game.difficulty !== selectedDifficulty) return false;
     if (selectedAge !== 'all') {
@@ -209,7 +215,7 @@ export default function NewGame() {
             </div>
             <div className="hidden md:flex items-center gap-3">
               <div className="px-3 py-1.5 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold">
-                Mode: {selectedMode === 'Individual' ? 'Solo' : 'Équipe'}
+                Mode: {selectedMode === 'Individual' ? 'Solo' : 'Solo en ligne'}
               </div>
               <div className="px-3 py-1.5 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold">
                 Jeux: {filteredGames.length}
@@ -217,8 +223,8 @@ export default function NewGame() {
             </div>
           </div>
         </motion.div>
-        {/* Mode équipe : Créer ou Rejoindre une room */}
-        {selectedMode === 'Collective' && (
+        {/* Mode en ligne : adversaires jouant chacun en solo */}
+        {selectedMode === 'Online' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -226,13 +232,13 @@ export default function NewGame() {
           >
             <h2 className="text-base font-bold text-white mb-3 flex items-center gap-2">
               <Users className="w-5 h-5 text-violet-600" />
-              Mode équipe
+              Solo en ligne compétitif
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white/5 rounded-xl p-4 border border-white/15">
                 <h3 className="font-bold text-white mb-2">Créer une room</h3>
                 <p className="text-sm text-slate-300 mb-4">
-                  Choisis un jeu dans la liste ci-dessous et clique sur <strong>Play</strong>. Une room sera créée et tu obtiendras un <strong>code</strong> à partager avec tes coéquipiers.
+                  Choisis un jeu puis clique sur <strong>Play</strong>. Une room sera créée avec un <strong>code</strong> à partager avec tes adversaires. Chacun joue seul et le meilleur score gagne.
                 </p>
                 <p className="text-xs text-violet-600 font-medium">↓ Choisis un jeu plus bas puis clique sur Play</p>
               </div>
@@ -343,15 +349,15 @@ export default function NewGame() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedMode('Collective')}
+                  onClick={() => setSelectedMode('Online')}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedMode === 'Collective'
+                    selectedMode === 'Online'
                       ? 'bg-violet-600 text-white'
                       : 'bg-white/10 text-slate-200 hover:bg-white/20'
                   }`}
                 >
                   <Users className="w-4 h-4 inline mr-1" />
-                  Équipe
+                  Solo en ligne
                 </motion.button>
               </div>
             </div>
@@ -407,14 +413,17 @@ export default function NewGame() {
                     {game.difficulty}
                   </span>
                 </div>
-                <div className="mb-3">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${
-                    game.modeJeu === 'COLLECTIF'
+                    game.modeJeu === 'EN_LIGNE'
                       ? 'bg-violet-500/20 text-violet-200 border-violet-300/40'
                       : 'bg-cyan-500/20 text-cyan-200 border-cyan-300/40'
                   }`}>
-                    Mode: {game.modeJeu === 'COLLECTIF' ? 'Équipe' : 'Solo'}
+                    Mode: {game.modeJeu === 'EN_LIGNE' ? 'Solo en ligne · contre adversaires' : 'Solo'}
                   </span>
+                  {game.type === 'quiz' && (
+                    <PlayerQuizVariantChip variant={game.quizVariant ?? 'DEFAULT'} />
+                  )}
                 </div>
                 <p className="text-slate-300 text-sm mb-3 line-clamp-2 min-h-[36px]">{game.description}</p>
                 <div className="flex items-center gap-3 text-xs text-slate-300 mb-3">

@@ -1,7 +1,9 @@
 // Types (données réelles via API)
 // UserDTO et types requêtes/réponses API : @/api/types
 
-export type { UserDTO } from '@/api/types';
+import type { QuizPlayMode } from '@/api/types';
+
+export type { UserDTO, QuizPlayMode } from '@/api/types';
 
 export interface User {
   id: string;
@@ -57,30 +59,16 @@ export interface Game {
   title: string;
   description: string;
   type: 'quiz' | 'memory' | 'logic' | 'reflex';
-  modeJeu?: 'INDIVIDUEL' | 'COLLECTIF';
+  modeJeu?: 'INDIVIDUEL' | 'EN_LIGNE';
   ageRange: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   estimatedTime: string;
   durationMinutes?: number;
+  quizPlayMode?: QuizPlayMode;
+  quizVariant?: string;
   icon: string;
   coverImageUrl?: string;
   active?: boolean;
-}
-
-export interface Session {
-  id: string;
-  gameId: string;
-  gameTitle: string;
-  gameType: string;
-  dateDebut: string;
-  duree: string;
-  scoreFinal: number;
-  niveauAtteint: number;
-  reussite: boolean;
-  statut: 'EN_COURS' | 'TERMINEE' | 'ABANDONNEE';
-  mode: 'Individual' | 'Collective';
-  accuracy?: number;
-  reactionTime?: number;
 }
 
 export interface Badge {
@@ -100,19 +88,6 @@ export interface QuizQuestion {
   correctAnswer: number;
   explanation: string;
   points: number;
-}
-
-export interface AdminPlayer {
-  id: string;
-  avatar: string;
-  name: string;
-  email: string;
-  age: number;
-  level: number;
-  score: number;
-  status: 'Active' | 'Suspended';
-  joinDate: string;
-  lastActive: string;
 }
 
 export interface AdminQuestion {

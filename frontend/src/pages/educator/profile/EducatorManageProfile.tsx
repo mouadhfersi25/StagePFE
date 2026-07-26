@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Save, Mail, User, Phone, Upload, Loader2, Trash2, Lock } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { ArrowLeft, Save, Mail, User, Phone, Loader2, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import { userService } from '@/services/user.service';
@@ -9,12 +9,8 @@ import storage from '@/utils/storage';
 import type { UserDTO, UpdateProfileRequest } from '@/api/types';
 import { validateRequired, validatePhone, validateMaxLength, validateMinLength, type ValidationResult } from '@/utils/formValidation';
 
-const MAX_IMAGE_SIZE_MB = 2;
-const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp,image/gif';
-
 export default function EducatorManageProfile() {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<UserDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,7 +22,6 @@ export default function EducatorManageProfile() {
     nom: '',
     prenom: '',
     telephone: '',
-    avatarUrl: '',
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -49,7 +44,6 @@ export default function EducatorManageProfile() {
           nom: d.nom ?? '',
           prenom: d.prenom ?? '',
           telephone: d.telephone ?? '',
-          avatarUrl: d.avatarUrl ?? '',
         });
       })
       .catch((err) => {
@@ -69,33 +63,6 @@ export default function EducatorManageProfile() {
     setError(null);
     setSuccess(null);
     setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(null);
-    setSuccess(null);
-    if (!file.type.startsWith('image/')) {
-      setError('Veuillez choisir une image (JPEG, PNG, WebP ou GIF).');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
-      setError(`L'image ne doit pas dépasser ${MAX_IMAGE_SIZE_MB} Mo.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const removeAvatar = () => {
-    setForm((prev) => ({ ...prev, avatarUrl: '' }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validateProfile = (): boolean => {
@@ -127,7 +94,6 @@ export default function EducatorManageProfile() {
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
         telephone: form.telephone || undefined,
-        avatarUrl: form.avatarUrl || null,
       });
       if (updated?.prenom != null) storage.set('auth_prenom', updated.prenom as string);
       if (updated?.nom != null) storage.set('auth_nom', updated.nom as string);
@@ -169,9 +135,6 @@ export default function EducatorManageProfile() {
       setSaving(false);
     }
   };
-
-  const avatarPreview = form.avatarUrl && (form.avatarUrl.startsWith('data:') || form.avatarUrl.startsWith('http'));
-  const avatarInitial = (form.prenom?.[0] || form.nom?.[0] || profile?.email?.[0] || '?').toUpperCase();
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -288,45 +251,6 @@ export default function EducatorManageProfile() {
               </motion.form>
 
               <div className="space-y-6">
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200 p-6">
-                  <p className="text-sm font-semibold text-slate-800 mb-4">Avatar</p>
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
-                      {avatarPreview ? (
-                        <img src={form.avatarUrl!} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-2xl font-semibold text-slate-400">{avatarInitial}</span>
-                      )}
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={ACCEPT_IMAGES}
-                      onChange={handleAvatarFile}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 transition-colors"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Choisir image
-                    </button>
-                    {(form.avatarUrl ?? profile.avatarUrl) && (
-                      <button
-                        type="button"
-                        onClick={removeAvatar}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer
-                      </button>
-                    )}
-                    <p className="text-xs text-slate-500 text-center">JPEG, PNG, WebP ou GIF. Max 2 Mo.</p>
-                  </div>
-                </motion.div>
-
                 <motion.form onSubmit={handleChangePassword} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
                   <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                     <Lock className="w-4 h-4 text-slate-500" />

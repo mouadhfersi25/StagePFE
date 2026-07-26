@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAdminData } from '@/context';
 import type { Game } from '@/data/types';
 import type { CreateGameRequest, TypeJeu, ModeJeu } from '@/api/types';
 import adminApi from '@/api/admin';
+import { InputField, SelectField, TextareaField } from '@/components/forms/FormFields';
 import {
   validateRequired,
   validateInteger,
@@ -161,39 +162,34 @@ export default function AddGame() {
               Infos générales
             </h2>
             <div className="space-y-5">
-              <div>
-                <label className={labelClass}>Titre du jeu *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setErrors((p) => ({ ...p, title: '' })); }}
-                  onBlur={() => {
-                    const msg = validateRequired(formData.title, 'Titre du jeu requis');
-                    setErrors((p) => (msg ? { ...p, title: msg } : { ...p, title: '' }));
-                  }}
-                  className={`${inputClass} ${errors.title ? 'border-red-500' : ''}`}
-                  placeholder=""
-                />
-                {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-              </div>
-              <div>
-                <label className={`${labelClass} font-bold text-gray-700`}>Description du jeu *</label>
-                <textarea
-                  className={`${inputClass} min-h-[120px] resize-y ${errors.description ? 'border-red-500' : ''}`}
-                  placeholder=""
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
-                  onBlur={() => {
-                    const msg = validateRequired(formData.description, 'La description est requise') ?? validateMaxLength(formData.description ?? '', 2000, 'Maximum 2000 caractères');
-                    setErrors((p) => (msg ? { ...p, description: msg } : { ...p, description: '' }));
-                  }}
-                  className={`${inputClass} min-h-[120px] resize-y ${errors.description ? 'border-red-500' : ''}`}
-                  placeholder="Décrivez le jeu pour les joueurs..."
-                  rows={4}
-                />
-                {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
-              </div>
+              <InputField
+                label="Titre du jeu"
+                required
+                type="text"
+                value={formData.title}
+                onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setErrors((p) => ({ ...p, title: '' })); }}
+                onBlur={() => {
+                  const msg = validateRequired(formData.title, 'Titre du jeu requis');
+                  setErrors((p) => (msg ? { ...p, title: msg } : { ...p, title: '' }));
+                }}
+                inputClassName={inputClass}
+                error={errors.title}
+              />
+              <TextareaField
+                label="Description du jeu"
+                required
+                rows={4}
+                className="min-h-[120px] resize-y"
+                value={formData.description}
+                onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
+                onBlur={() => {
+                  const msg = validateRequired(formData.description, 'La description est requise') ?? validateMaxLength(formData.description ?? '', 2000, 'Maximum 2000 caractères');
+                  setErrors((p) => (msg ? { ...p, description: msg } : { ...p, description: '' }));
+                }}
+                placeholder="Décrivez le jeu pour les joueurs..."
+                inputClassName={inputClass}
+                error={errors.description}
+              />
             </div>
           </section>
 
@@ -202,48 +198,45 @@ export default function AddGame() {
               Type & paramètres
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
-              <div>
-                <label className={labelClass}>Type de jeu *</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => { setFormData({ ...formData, type: e.target.value as Game['type'] | '' }); setErrors((p) => ({ ...p, type: '' })); }}
-                  className={`${inputClass} ${errors.type ? 'border-red-500' : ''}`}
-                >
+              <SelectField
+                label="Type de jeu"
+                required
+                value={formData.type}
+                onChange={(e) => { setFormData({ ...formData, type: e.target.value as Game['type'] | '' }); setErrors((p) => ({ ...p, type: '' })); }}
+                inputClassName={inputClass}
+                error={errors.type}
+              >
                   <option value="">— Choisir —</option>
                   <option value="quiz">Quiz</option>
                   <option value="memory">Memory</option>
                   <option value="logic">Logic</option>
                   <option value="reflex">Reflex</option>
-                </select>
-                {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>Mode de jeu *</label>
-                <select
-                  value={formData.mode}
-                  onChange={(e) => { setFormData({ ...formData, mode: e.target.value as ModeJeu | '' }); setErrors((p) => ({ ...p, mode: '' })); }}
-                  className={`${inputClass} ${errors.mode ? 'border-red-500' : ''}`}
-                >
+              </SelectField>
+              <SelectField
+                label="Mode de jeu"
+                required
+                value={formData.mode}
+                onChange={(e) => { setFormData({ ...formData, mode: e.target.value as ModeJeu | '' }); setErrors((p) => ({ ...p, mode: '' })); }}
+                inputClassName={inputClass}
+                error={errors.mode}
+              >
                   <option value="">— Choisir —</option>
                   <option value="INDIVIDUEL">Individuel</option>
-                  <option value="COLLECTIF">Collectif</option>
-                </select>
-                {errors.mode && <p className="mt-1 text-sm text-red-600">{errors.mode}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>Difficulté *</label>
-                <select
-                  value={formData.difficulty}
-                  onChange={(e) => { setFormData({ ...formData, difficulty: e.target.value as Game['difficulty'] | '' }); setErrors((p) => ({ ...p, difficulty: '' })); }}
-                  className={`${inputClass} ${errors.difficulty ? 'border-red-500' : ''}`}
-                >
+                  <option value="EN_LIGNE">En ligne · chacun pour soi</option>
+              </SelectField>
+              <SelectField
+                label="Difficulté"
+                required
+                value={formData.difficulty}
+                onChange={(e) => { setFormData({ ...formData, difficulty: e.target.value as Game['difficulty'] | '' }); setErrors((p) => ({ ...p, difficulty: '' })); }}
+                inputClassName={inputClass}
+                error={errors.difficulty}
+              >
                   <option value="">— Choisir —</option>
                   <option value="Easy">Facile</option>
                   <option value="Medium">Moyen</option>
                   <option value="Hard">Difficile</option>
-                </select>
-                {errors.difficulty && <p className="mt-1 text-sm text-red-600">{errors.difficulty}</p>}
-              </div>
+              </SelectField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>

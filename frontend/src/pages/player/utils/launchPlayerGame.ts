@@ -5,7 +5,7 @@ type NavigateFn = (to: string, options?: { state?: unknown }) => void;
 interface LaunchPlayerGameParams {
   gameId: string | number;
   gameTypeRoute: string;
-  modeJeu?: 'INDIVIDUEL' | 'COLLECTIF';
+  modeJeu?: 'INDIVIDUEL' | 'EN_LIGNE';
   gamePayload: unknown;
   navigate: NavigateFn;
   enterFullscreen?: () => Promise<void> | void;
@@ -25,13 +25,13 @@ export async function launchPlayerGame(params: LaunchPlayerGameParams): Promise<
 
   if (enterFullscreen) await enterFullscreen();
 
-  if (modeJeu === 'COLLECTIF') {
+  if (modeJeu === 'EN_LIGNE') {
     const safePlayer = player ?? { id: 'guest', name: 'Joueur', avatar: '👤' };
     const roomCode = await createRoom(String(gameId), safePlayer);
     navigate(`/player/waiting-room/${gameId}?room=${roomCode}`, {
       state: {
         game: gamePayload,
-        mode: 'Collective',
+        mode: 'Online',
         roomCode,
       },
     });

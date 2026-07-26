@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Edit, Trash2, Loader2, Gamepad2, Layers, HelpCircle, Zap, Puzzle, Eye } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
 import type { GameDTO } from '@/api/types';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import { filterGamesForManageList } from './manageGamesListFilter';
+import { QuizVariantBadge } from '@/components/educator/QuizVariantPicker';
+import { QUIZ_VARIANT_CATALOG } from '@/constants/quizVariants';
 
 const TYPE_CONFIGS: Record<string, { label: string; bg: string; icon: React.ReactNode; defaultIcon: string; path: string; dbType: string; hasContentPage: boolean }> = {
   quiz: { label: 'Quiz', bg: 'bg-emerald-500', icon: <HelpCircle className="w-5 h-5" />, defaultIcon: '🧮', path: 'questions', dbType: 'QUIZ', hasContentPage: true },
@@ -175,6 +177,31 @@ export default function EducatorGameTypeSection() {
             </div>
           </div>
 
+          {dbType === 'QUIZ' && (
+            <div className="mb-8 rounded-2xl border border-emerald-200 bg-white p-4 md:p-5 shadow-sm">
+              <h2 className="text-sm font-bold text-emerald-900 uppercase tracking-wide mb-3">
+                Les 7 variantes de quiz
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Chaque jeu quiz utilise <strong>une seule</strong> variante. Créez un jeu par style pédagogique.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {QUIZ_VARIANT_CATALOG.map((v) => (
+                  <div
+                    key={v.value}
+                    className={`rounded-xl border-2 p-3 ${v.accent}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-lg">{v.icon}</span>
+                      <span className="text-sm font-bold text-gray-900">{v.shortLabel}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">{v.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {loading && (
             <div className="flex justify-center py-12">
               <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
@@ -208,9 +235,12 @@ export default function EducatorGameTypeSection() {
                         </div>
                         <div>
                           <h3 className="font-bold text-gray-900 max-w-[200px] truncate" title={game.titre}>{game.titre}</h3>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold mt-1 inline-block ${status.color}`}>
-                            {status.icon} {status.label}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-block ${status.color}`}>
+                              {status.icon} {status.label}
+                            </span>
+                            {dbType === 'QUIZ' && <QuizVariantBadge variant={game.quizVariant} />}
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">

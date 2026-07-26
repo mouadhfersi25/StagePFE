@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
-import type { QuizQuestionDTO } from '@/api/types/api.types';
+import type { QuizQuestionDTO, GameDTO } from '@/api/types/api.types';
+import { QuizVariantBadge } from '@/components/educator/QuizVariantPicker';
+import { getQuizVariantMeta } from '@/constants/quizVariants';
 
 function difficultyLabel(d: number | null): string {
   return d === 1 ? 'Easy' : d === 2 ? 'Medium' : d === 3 ? 'Hard' : 'Medium';
@@ -16,6 +18,7 @@ export default function ViewQuestion() {
   const questionId = id ? Number(id) : NaN;
 
   const [question, setQuestion] = useState<QuizQuestionDTO | null>(null);
+  const [linkedGame, setLinkedGame] = useState<GameDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,9 +35,16 @@ export default function ViewQuestion() {
 
     educatorApi
       .getQuestionById(questionId)
-      .then((res) => {
+      .then(async (res) => {
         if (cancelled) return;
-        setQuestion(res.data as QuizQuestionDTO);
+        const q = res.data as QuizQuestionDTO;
+        setQuestion(q);
+        try {
+          const gRes = await educatorApi.getGameById(q.jeuId);
+          if (!cancelled && gRes.data) setLinkedGame(gRes.data);
+        } catch {
+          /* optional */
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -48,6 +58,9 @@ export default function ViewQuestion() {
       cancelled = true;
     };
   }, [questionId]);
+
+  const variantCode = linkedGame?.quizVariant ?? question?.sousType ?? 'DEFAULT';
+  const variantMeta = getQuizVariantMeta(variantCode);
 
   const options = useMemo(() => (Array.isArray(question?.options) ? question!.options! : []), [question]);
   const correctIndex = useMemo(() => {
@@ -119,12 +132,30 @@ export default function ViewQuestion() {
               >
                 {diff}
               </span>
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${variantMeta.badge}`}>
+                <span>{variantMeta.icon}</span>
+                {variantMeta.label}
+              </span>
             </div>
 
             <div className="mb-5">
               <h2 className="text-base font-semibold text-gray-900 mb-2">Énoncé</h2>
               <p className="text-gray-700 whitespace-pre-wrap">{question.contenu}</p>
             </div>
+
+            {question.mediaUrl && (
+              <div className="mb-5">
+                <h2 className="text-base font-semibold text-gray-900 mb-2">Média</h2>
+                <img src={question.mediaUrl} alt="media question" className="max-h-64 rounded-xl border border-gray-200 object-contain bg-white" />
+              </div>
+            )}
+
+            {question.promptAudioUrl && (
+              <div className="mb-5">
+                <h2 className="text-base font-semibold text-gray-900 mb-2">Audio</h2>
+                <audio controls src={question.promptAudioUrl} className="w-full" />
+              </div>
+            )}
 
             <div className="mb-5">
               <h2 className="text-base font-semibold text-gray-900 mb-2">Options</h2>

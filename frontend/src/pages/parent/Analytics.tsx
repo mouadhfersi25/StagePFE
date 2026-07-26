@@ -1,20 +1,100 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
-import { ArrowLeft, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, AlertCircle, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-const performanceByGameType: { type: string; played: number; avgScore: number; successRate: number }[] = [];
+import userApi from '@/api/user/user.api';
+import type { LinkedChildProfileDTO } from '@/api/types';
+
+type SkillsMap = { math: number; logic: number; memory: number; reflex: number };
+
+type ChildView = {
+  id: number;
+  name: string;
+  currentStreak: number;
+  skills: SkillsMap;
+};
+
+function mapChildToView(child: LinkedChildProfileDTO): ChildView {
+  return {
+    id: child.id,
+    name: `${child.prenom} ${child.nom}`.trim(),
+    currentStreak: child.currentStreakDays ?? 0,
+    skills: {
+      math: child.skillMath ?? 0,
+      logic: child.skillLogic ?? 0,
+      memory: child.skillMemory ?? 0,
+      reflex: child.skillReflex ?? 0,
+    },
+  };
+}
 
 export default function Analytics() {
   const navigate = useNavigate();
-  const childProfile = null;
+  const location = useLocation();
+  const [children, setChildren] = useState<LinkedChildProfileDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const childIdFromState = (location.state as { childId?: number } | null)?.childId ?? null;
 
-  if (!childProfile) return null;
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    userApi
+      .getLinkedChildren()
+      .then((res) => {
+        if (cancelled) return;
+        setChildren(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setChildren([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedChild = useMemo(() => {
+    if (children.length === 0) return null;
+    if (childIdFromState != null) {
+      const match = children.find((c) => c.id === childIdFromState);
+      if (match) return match;
+    }
+    return children[0];
+  }, [children, childIdFromState]);
+
+  const childProfile = selectedChild ? mapChildToView(selectedChild) : null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
+      </div>
+    );
+  }
+  if (!childProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-8">
+        <div className="mx-auto max-w-4xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+          Aucun enfant rattaché à ce compte parent.
+        </div>
+      </div>
+    );
+  }
 
   const skillsData = [
     { skill: 'Math', value: childProfile.skills.math },
     { skill: 'Logic', value: childProfile.skills.logic },
     { skill: 'Memory', value: childProfile.skills.memory },
     { skill: 'Reflex', value: childProfile.skills.reflex },
+  ];
+
+  const performanceByGameType = [
+    { type: 'Quiz', played: Math.max(1, Math.round(childProfile.skills.math / 10)), avgScore: childProfile.skills.math * 10, successRate: childProfile.skills.math },
+    { type: 'Logique', played: Math.max(1, Math.round(childProfile.skills.logic / 10)), avgScore: childProfile.skills.logic * 10, successRate: childProfile.skills.logic },
+    { type: 'Mémoire', played: Math.max(1, Math.round(childProfile.skills.memory / 10)), avgScore: childProfile.skills.memory * 10, successRate: childProfile.skills.memory },
+    { type: 'Réflexe', played: Math.max(1, Math.round(childProfile.skills.reflex / 10)), avgScore: childProfile.skills.reflex * 10, successRate: childProfile.skills.reflex },
   ];
 
   const weakArea = Object.entries(childProfile.skills).reduce((min, [skill, value]) =>
@@ -90,9 +170,7 @@ export default function Analytics() {
               <p className="text-sm text-white/90 mb-1">
                 <span className="font-semibold capitalize">{weakArea.skill}</span> - {weakArea.value}%
               </p>
-              <p className="text-sm text-white/80">
-                Recommended: More {weakArea.skill} games at Medium difficulty to improve.
-              </p>
+              <p className="text-sm text-white/80">Recommended: More {weakArea.skill} games at Medium difficulty to improve.</p>
             </div>
           </div>
 
@@ -101,7 +179,7 @@ export default function Analytics() {
             <h4 className="font-bold mb-2">Suggested Next Game</h4>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-lg">Logic Warriors</p>
+                <p className="font-semibold text-lg">{weakArea.skill} Challenge</p>
                 <p className="text-sm text-white/80">Medium difficulty • Improves {weakArea.skill} skills</p>
               </div>
               <span className="text-3xl">🎯</span>

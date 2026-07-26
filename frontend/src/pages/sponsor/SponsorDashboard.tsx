@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Megaphone,
@@ -564,9 +564,7 @@ export default function SponsorDashboard() {
         <aside className="hidden lg:flex w-72 border-r border-slate-200 bg-white flex-col">
           <div className="px-6 py-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-slate-900 text-white flex items-center justify-center">
-                <Megaphone className="h-5 w-5" />
-              </div>
+              <img src="/logo-edugame.png" alt="" className="h-10 w-10 shrink-0 rounded-xl object-contain" />
               <div>
                 <p className="text-base font-bold text-slate-900">EduGame AI</p>
                 <p className="text-xs text-slate-500">Portail Sponsor</p>
@@ -606,10 +604,17 @@ export default function SponsorDashboard() {
 
         <main className="flex-1">
           <header className="border-b border-slate-200 bg-white">
-            <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-extrabold text-slate-900">Dashboard Sponsor</h1>
-                <p className="text-sm text-slate-500">Espace professionnel de gestion publicitaire et récompenses</p>
+            <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <img
+                  src="/logo-edugame.png"
+                  alt="EduGame"
+                  className="hidden h-7 max-h-7 w-auto max-w-[180px] shrink-0 object-contain object-left sm:block"
+                />
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-extrabold text-slate-900">Dashboard Sponsor</h1>
+                  <p className="text-sm text-slate-500">Espace professionnel de gestion publicitaire et récompenses</p>
+                </div>
               </div>
               <button
                 type="button"

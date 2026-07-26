@@ -30,6 +30,24 @@ public class CarteMemoire {
     private String symbole;
 
     /**
+     * Type de contenu affiché sur la carte: EMOJI, TEXT, IMAGE, COLOR.
+     */
+    @Column(name = "card_type", length = 20)
+    private String cardType;
+
+    /**
+     * Valeur brute du contenu (texte, URL image, code couleur, etc.).
+     */
+    @Column(name = "card_value", columnDefinition = "TEXT")
+    private String cardValue;
+
+    /**
+     * Sous-type pédagogique du jeu mémoire.
+     */
+    @Column(name = "sous_type", length = 40)
+    private String sousType;
+
+    /**
      * Identifiant de paire pour regrouper deux cartes qui vont ensemble.
      */
     @Column(name = "pair_key", length = 50)

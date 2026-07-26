@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Pencil, Trash2, Loader2, Award, LayoutGrid, List } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import type { BadgeDTO } from '@/api/types/api.types';

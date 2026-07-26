@@ -67,6 +67,9 @@ public class EducatorQuestionService {
                 .contenu(request.getContenu())
                 .bonneReponse(request.getBonneReponse())
                 .options(optionsToJson(request.getOptions()))
+                .sousType(normalizeQuestionSousType(request.getSousType()))
+                .mediaUrl(trimToNull(request.getMediaUrl()))
+                .promptAudioUrl(trimToNull(request.getPromptAudioUrl()))
                 .explication(request.getExplication())
                 .difficulte(request.getDifficulte())
                 .build();
@@ -98,6 +101,15 @@ public class EducatorQuestionService {
         if (request.getOptions() != null) {
             question.setOptions(optionsToJson(request.getOptions()));
         }
+        if (request.getSousType() != null) {
+            question.setSousType(normalizeQuestionSousType(request.getSousType()));
+        }
+        if (request.getMediaUrl() != null) {
+            question.setMediaUrl(trimToNull(request.getMediaUrl()));
+        }
+        if (request.getPromptAudioUrl() != null) {
+            question.setPromptAudioUrl(trimToNull(request.getPromptAudioUrl()));
+        }
         question = questionRepository.save(question);
         touchGameContent(question.getJeu());
         return toDTO(question, question.getJeu());
@@ -128,6 +140,9 @@ public class EducatorQuestionService {
                 .contenu(question.getContenu())
                 .bonneReponse(question.getBonneReponse())
                 .options(jsonToOptions(question.getOptions()))
+                .sousType(normalizeQuestionSousType(question.getSousType()))
+                .mediaUrl(question.getMediaUrl())
+                .promptAudioUrl(question.getPromptAudioUrl())
                 .explication(question.getExplication())
                 .difficulte(question.getDifficulte())
                 .build();
@@ -149,6 +164,21 @@ public class EducatorQuestionService {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    private String normalizeQuestionSousType(String raw) {
+        String value = trimToNull(raw);
+        if (value == null) return "DEFAULT";
+        return switch (value.toUpperCase()) {
+            case "IMAGE_WORD", "SYNONYM_ANTONYM", "COLOR_TRANSLATION", "AUDIO_COLOR", "DEFAULT" -> value.toUpperCase();
+            default -> "DEFAULT";
+        };
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }
 

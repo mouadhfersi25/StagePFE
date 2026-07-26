@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
 import educatorApi from '@/api/educator/educator.api';
 import type { QuizQuestionDTO, GameDTO, UpdateQuizQuestionRequest } from '@/api/types/api.types';
+import QuestionMediaField from '@/components/educator/QuestionMediaField';
+import {
+  getQuizVariantMeta,
+  isCloze,
+  isTrueFalse,
+  requiresAudio,
+  requiresMedia,
+} from '@/constants/quizVariants';
+import { QuizVariantBadge } from '@/components/educator/QuizVariantPicker';
 
-const OPTIONS_COUNT = 4;
-const DIFFICULTE_OPTIONS: { value: number; label: string }[] = [
+const OPTIONS_COUNT = 4; { value: number; label: string }[] = [
   { value: 1, label: 'Facile' },
   { value: 2, label: 'Moyen' },
   { value: 3, label: 'Difficile' },
@@ -21,8 +29,14 @@ export default function EditQuestion() {
   const questionId = id ? Number(id) : null;
 
   const [question, setQuestion] = useState<QuizQuestionDTO | null>(null);
+  const [linkedGame, setLinkedGame] = useState<GameDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState('');
+  const [promptAudioFile, setPromptAudioFile] = useState<File | null>(null);
+  const [audioPreview, setAudioPreview] = useState('');
+
   const [formData, setFormData] = useState<{
     contenu: string;
     options: string[];
@@ -37,6 +51,26 @@ export default function EditQuestion() {
     difficulte: '',
   });
 
+  const gameVariant = linkedGame?.quizVariant ?? 'DEFAULT';
+
+  const handleMediaFile = (file: File | null) => {
+    setMediaFile(file);
+    setMediaPreview((prev) => {
+      if (prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      if (file) return URL.createObjectURL(file);
+      return question?.mediaUrl ?? '';
+    });
+  };
+
+  const handleAudioFile = (file: File | null) => {
+    setPromptAudioFile(file);
+    setAudioPreview((prev) => {
+      if (prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      if (file) return URL.createObjectURL(file);
+      return question?.promptAudioUrl ?? '';
+    });
+  };
+
   useEffect(() => {
     if (questionId == null || Number.isNaN(questionId)) {
       setLoading(false);
@@ -48,9 +82,12 @@ export default function EditQuestion() {
       .then(async (res) => {
         if (cancelled) return;
         const q = res.data as QuizQuestionDTO;
+        let linkedGameData: GameDTO | null = null;
         try {
           const gRes = await educatorApi.getGameById(q.jeuId);
-          if (gRes.data && gRes.data.etat !== 'BROUILLON' && gRes.data.etat !== 'REFUSE') {
+          linkedGameData = gRes.data ?? null;
+          if (linkedGameData) setLinkedGame(linkedGameData);
+          if (linkedGameData && linkedGameData.etat !== 'BROUILLON' && linkedGameData.etat !== 'REFUSE') {
             toast.info('Ce jeu est en attente ou déjà accepté : modification impossible.');
             navigate('/educator/games/manage', { replace: true });
             return;
@@ -61,12 +98,24 @@ export default function EditQuestion() {
           return;
         }
         setQuestion(q);
+        const variant = linkedGameData?.quizVariant ?? q.sousType ?? 'DEFAULT';
+        const isTf = variant === 'TRUE_FALSE';
+        const isCz = variant === 'CLOZE';
         const raw = q.options && q.options.length > 0 ? [...q.options] : [];
-        const opts: string[] = [];
-        for (let i = 0; i < OPTIONS_COUNT; i++) opts.push(raw[i] ?? '');
-        const correctIndex = q.bonneReponse
-          ? Math.max(0, opts.findIndex((o) => o === q.bonneReponse))
-          : 0;
+        const opts: string[] = isTf
+          ? ['Vrai', 'Faux', '', '']
+          : (() => {
+              const padded: string[] = [];
+              for (let i = 0; i < OPTIONS_COUNT; i++) padded.push(raw[i] ?? '');
+              return padded;
+            })();
+        const correctIndex = isTf
+          ? (q.bonneReponse?.trim().toLowerCase() === 'faux' ? 1 : 0)
+          : isCz
+            ? Math.max(0, opts.findIndex((o) => o.trim() && o.trim().toLowerCase() === (q.bonneReponse ?? '').trim().toLowerCase()))
+            : (q.bonneReponse
+                ? Math.max(0, opts.findIndex((o) => o === q.bonneReponse))
+                : 0);
         setFormData({
           contenu: q.contenu ?? '',
           options: opts,
@@ -74,6 +123,8 @@ export default function EditQuestion() {
           explication: q.explication ?? '',
           difficulte: q.difficulte ?? '',
         });
+        setMediaPreview(q.mediaUrl ?? '');
+        setAudioPreview(q.promptAudioUrl ?? '');
       })
       .catch(() => {
         if (!cancelled) {
@@ -98,18 +149,46 @@ export default function EditQuestion() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (questionId == null || !question) return;
-    const optionsFiltered = formData.options.map((o) => o.trim()).filter(Boolean);
-    if (optionsFiltered.length !== OPTIONS_COUNT) {
+    const contenu = formData.contenu.trim();
+    if (!contenu) {
+      toast.error("L'énoncé est obligatoire.");
+      return;
+    }
+    if (isCloze(gameVariant) && !contenu.includes('___')) {
+      toast.error('La phrase doit contenir ___ pour le mot à compléter.');
+      return;
+    }
+
+    if (requiresMedia(gameVariant) && !mediaFile && !mediaPreview) {
+      toast.error("L'image est obligatoire pour la variante Image -> Mot.");
+      return;
+    }
+    if (requiresAudio(gameVariant) && !promptAudioFile && !audioPreview) {
+      toast.error("L'audio est obligatoire pour la variante Ecoute couleur (audio).");
+      return;
+    }
+
+    const optionsFiltered = isTrueFalse(gameVariant)
+      ? ['Vrai', 'Faux']
+      : formData.options.map((o) => o.trim()).filter(Boolean);
+    if (isCloze(gameVariant)) {
+      if (optionsFiltered.length < 3 || optionsFiltered.length > 6) {
+        toast.error('Ajoutez entre 3 et 6 mots proposés.');
+        return;
+      }
+    } else if (!isTrueFalse(gameVariant) && optionsFiltered.length !== OPTIONS_COUNT) {
       toast.error(`Veuillez remplir les ${OPTIONS_COUNT} options.`);
       return;
     }
-    const bonneReponse = optionsFiltered[formData.correctAnswerIndex];
+    const bonneReponse = isTrueFalse(gameVariant)
+      ? (formData.correctAnswerIndex === 1 ? 'Faux' : 'Vrai')
+      : optionsFiltered[formData.correctAnswerIndex];
     if (!bonneReponse) {
       toast.error('Sélectionnez la bonne réponse.');
       return;
     }
     const payload: UpdateQuizQuestionRequest = {
-      contenu: formData.contenu.trim(),
+      contenu,
       bonneReponse,
       options: optionsFiltered,
     };
@@ -119,7 +198,13 @@ export default function EditQuestion() {
     setSubmitting(true);
     educatorApi
       .updateQuestion(questionId, payload)
-      .then(() => {
+      .then(async () => {
+        if (mediaFile) {
+          await educatorApi.uploadQuestionMedia(questionId, mediaFile);
+        }
+        if (promptAudioFile) {
+          await educatorApi.uploadQuestionPromptAudio(questionId, promptAudioFile);
+        }
         toast.success('Question mise à jour.');
         navigate(`/educator/games/quiz/${question.jeuId}/questions`);
       })
@@ -191,17 +276,113 @@ export default function EditQuestion() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contenu (énoncé) <span className="text-red-500">*</span>
+                  {isTrueFalse(gameVariant)
+                    ? 'Affirmation'
+                    : isCloze(gameVariant)
+                      ? 'Phrase à compléter'
+                      : 'Contenu (énoncé)'}{' '}
+                  <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={formData.contenu}
                   onChange={(e) => setFormData({ ...formData, contenu: e.target.value })}
                   className={`${inputClass} min-h-[100px]`}
-                  placeholder="Énoncé de la question..."
+                  placeholder={
+                    isTrueFalse(gameVariant)
+                      ? 'Ex. : La Terre tourne autour du Soleil.'
+                      : isCloze(gameVariant)
+                        ? 'Ex. : Le chat ___ sur le tapis.'
+                        : 'Énoncé de la question...'
+                  }
                   required
                 />
               </div>
 
+              <div className={`rounded-xl border-2 p-4 ${getQuizVariantMeta(gameVariant).accent}`}>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-xl">{getQuizVariantMeta(gameVariant).icon}</span>
+                  <span className="font-semibold text-gray-900">Variante du quiz</span>
+                  <QuizVariantBadge variant={gameVariant} />
+                </div>
+                <p className="text-sm text-gray-700">{getQuizVariantMeta(gameVariant).description}</p>
+                <p className="text-xs text-gray-500 mt-2 italic">{getQuizVariantMeta(gameVariant).example}</p>
+              </div>
+
+              {requiresMedia(gameVariant) && (
+                <QuestionMediaField
+                  kind="image"
+                  label="Image de la question"
+                  required
+                  previewUrl={mediaPreview}
+                  fileName={mediaFile?.name}
+                  onFileSelect={handleMediaFile}
+                  disabled={submitting}
+                />
+              )}
+
+              {requiresAudio(gameVariant) && (
+                <QuestionMediaField
+                  kind="audio"
+                  label="Audio (écoute couleur)"
+                  required={!audioPreview}
+                  previewUrl={audioPreview}
+                  fileName={promptAudioFile?.name}
+                  onFileSelect={handleAudioFile}
+                  disabled={submitting}
+                />
+              )}
+
+              {isTrueFalse(gameVariant) ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Bonne réponse <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {(['Vrai', 'Faux'] as const).map((label, index) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, correctAnswerIndex: index })}
+                        className={`px-6 py-5 rounded-xl border-2 text-lg font-bold transition-all ${
+                          formData.correctAnswerIndex === index
+                            ? label === 'Vrai'
+                              ? 'border-green-500 bg-green-50 text-green-800'
+                              : 'border-red-500 bg-red-50 text-red-800'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : isCloze(gameVariant) ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Mots proposés (3 à 6) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-3">
+                    {formData.options.map((option, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="correctAnswer"
+                          checked={formData.correctAnswerIndex === index && option.trim() !== ''}
+                          onChange={() => setFormData({ ...formData, correctAnswerIndex: index })}
+                          className="w-4 h-4 text-green-600 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => setOptionText(index, e.target.value)}
+                          className={`${inputClass} flex-1`}
+                          placeholder={`Mot ${index + 1}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Options de réponse (4 obligatoires) <span className="text-red-500">*</span>
@@ -231,6 +412,7 @@ export default function EditQuestion() {
                   Sélectionnez la bonne réponse en cliquant sur le bouton radio.
                 </p>
               </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

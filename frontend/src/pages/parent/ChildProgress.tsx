@@ -1,215 +1,178 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
-import { ArrowLeft, TrendingUp, Award, Target, Zap } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-const progressData: { week: string; xp: number; score: number }[] = [];
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, TrendingUp, Target, Flame, Loader2 } from 'lucide-react';
+import userApi from '@/api/user/user.api';
+import type { LinkedChildProfileDTO } from '@/api/types';
+
+type SkillsMap = { math: number; logic: number; memory: number; reflex: number };
+
+type ChildView = {
+  id: number;
+  name: string;
+  level: number;
+  xp: number;
+  xpToNextLevel: number;
+  totalScore: number;
+  currentStreak: number;
+  skills: SkillsMap;
+};
+
+function mapChildToView(child: LinkedChildProfileDTO): ChildView {
+  return {
+    id: child.id,
+    name: `${child.prenom} ${child.nom}`.trim(),
+    level: child.niveau ?? 1,
+    xp: child.pointsExperience ?? 0,
+    xpToNextLevel: Math.max(1, child.xpToNextLevel ?? 100),
+    totalScore: child.scoreTotal ?? 0,
+    currentStreak: child.currentStreakDays ?? 0,
+    skills: {
+      math: child.skillMath ?? 0,
+      logic: child.skillLogic ?? 0,
+      memory: child.skillMemory ?? 0,
+      reflex: child.skillReflex ?? 0,
+    },
+  };
+}
 
 export default function ChildProgress() {
   const navigate = useNavigate();
-  const childProfile = null;
+  const location = useLocation();
+  const [children, setChildren] = useState<LinkedChildProfileDTO[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (!childProfile) return null;
+  const childIdFromState = (location.state as { childId?: number } | null)?.childId ?? null;
 
-  const levelData = [
-    { month: 'Jan', level: 3 },
-    { month: 'Feb', level: 4 },
-    { month: 'Mar', level: 5 },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    userApi
+      .getLinkedChildren()
+      .then((res) => {
+        if (cancelled) return;
+        setChildren(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setChildren([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedChild = useMemo(() => {
+    if (children.length === 0) return null;
+    if (childIdFromState != null) {
+      const match = children.find((c) => c.id === childIdFromState);
+      if (match) return match;
+    }
+    return children[0];
+  }, [children, childIdFromState]);
+
+  const childProfile = selectedChild ? mapChildToView(selectedChild) : null;
+  const xpPct = childProfile
+    ? Math.min(100, Math.max(0, (childProfile.xp / Math.max(1, childProfile.xpToNextLevel)) * 100))
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => navigate('/parent/dashboard')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-6 h-6 text-gray-700" />
-            </motion.button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Child Progress</h1>
-              <p className="text-sm text-gray-600">{childProfile.name}'s learning journey</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100/90 text-slate-900">
+      <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/parent/dashboard')}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700"
+            aria-label="Retour"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </motion.button>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Progression enfant</h1>
+            <p className="text-sm text-slate-500">Données dynamiques liées à l’enfant sélectionné</p>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Current Level</p>
-                <p className="text-2xl font-bold text-gray-900">{childProfile.level}</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Target className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total XP</p>
-                <p className="text-2xl font-bold text-gray-900">{childProfile.xp}</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <Award className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Badges</p>
-                <p className="text-2xl font-bold text-gray-900">{childProfile.badgesEarned}</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl p-6 shadow-lg"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                <Zap className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{childProfile.averageSuccessRate}%</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Level Timeline */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
-        >
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Level Progression</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={levelData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="level"
-                stroke="#8b5cf6"
-                strokeWidth={3}
-                name="Level"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* XP Evolution */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
-        >
-          <h3 className="text-xl font-bold text-gray-900 mb-6">XP Evolution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={progressData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="week" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Legend />
-              <Line type="monotone" dataKey="xp" stroke="#3b82f6" strokeWidth={3} name="XP" />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Skills Analysis */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-white rounded-2xl p-6 shadow-lg"
-        >
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Skills Analysis</h3>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="flex justify-center py-20 text-slate-500">
+            <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
+          </div>
+        ) : !childProfile ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+            Aucun enfant rattaché à ce compte parent.
+          </div>
+        ) : (
           <div className="space-y-6">
-            {Object.entries(childProfile.skills).map(([skill, value]) => (
-              <div key={skill}>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <span className="font-semibold text-gray-900 capitalize text-lg">{skill}</span>
-                    <p className="text-sm text-gray-600">
-                      {value >= 80
-                        ? 'Excellent performance'
-                        : value >= 70
-                        ? 'Good performance'
-                        : 'Needs improvement'}
-                    </p>
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900">{childProfile.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">Niveau actuel et progression XP</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                  <div className="mb-1 flex items-center gap-2 text-slate-600">
+                    <TrendingUp className="h-4 w-4 text-teal-600" />
+                    <span className="text-xs font-semibold uppercase">Niveau</span>
                   </div>
-                  <span className="text-2xl font-bold text-purple-600">{value}%</span>
+                  <p className="text-2xl font-bold">{childProfile.level}</p>
                 </div>
-                <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                  <div className="mb-1 flex items-center gap-2 text-slate-600">
+                    <Target className="h-4 w-4 text-teal-600" />
+                    <span className="text-xs font-semibold uppercase">Score total</span>
+                  </div>
+                  <p className="text-2xl font-bold">{childProfile.totalScore.toLocaleString('fr-FR')}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                  <div className="mb-1 flex items-center gap-2 text-slate-600">
+                    <Flame className="h-4 w-4 text-teal-600" />
+                    <span className="text-xs font-semibold uppercase">Série actuelle</span>
+                  </div>
+                  <p className="text-2xl font-bold">{childProfile.currentStreak} j</p>
+                </div>
+              </div>
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+                  <span>XP</span>
+                  <span className="tabular-nums">
+                    {childProfile.xp} / {childProfile.xpToNextLevel}
+                  </span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${value}%` }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                    className={`absolute inset-y-0 left-0 rounded-full ${
-                      value >= 80
-                        ? 'bg-green-500'
-                        : value >= 70
-                        ? 'bg-blue-500'
-                        : 'bg-yellow-500'
-                    }`}
+                    animate={{ width: `${xpPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500"
                   />
                 </div>
               </div>
-            ))}
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900">Compétences</h3>
+              <p className="mt-1 text-sm text-slate-500">Calculées à partir des sessions terminées</p>
+              <div className="mt-5 space-y-4">
+                {Object.entries(childProfile.skills).map(([key, value]) => (
+                  <div key={key}>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-800 capitalize">{key}</span>
+                      <span className="tabular-nums font-bold text-slate-600">{value}%</span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
+                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
-        </motion.div>
-      </div>
+        )}
+      </main>
     </div>
   );
 }

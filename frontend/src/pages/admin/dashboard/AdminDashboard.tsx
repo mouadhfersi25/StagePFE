@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Users, Gamepad2, Play, Award, TrendingUp, Clock, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context';
 import adminApi from '@/api/admin';
-import type { GameDTO, EtatJeu, AdminScoringDistributionDTO } from '@/api/types';
+import type { GameDTO, EtatJeu, AdminScoringDistributionDTO, AdminDaySessionCountDTO, AdminRecentActivityDTO } from '@/api/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Check, X, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import RejectGameModal from '@/components/admin/RejectGameModal';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS_FALLBACK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -24,6 +24,11 @@ export default function AdminDashboard() {
   const [scoringDistribution, setScoringDistribution] = useState<AdminScoringDistributionDTO[]>([]);
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [rejectingGame, setRejectingGame] = useState<GameDTO | null>(null);
+
+  const [weeklyData, setWeeklyData] = useState<AdminDaySessionCountDTO[]>([]);
+  const [loadingWeekly, setLoadingWeekly] = useState(true);
+  const [activityLogs, setActivityLogs] = useState<AdminRecentActivityDTO[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
 
   const email = user?.email ?? '';
   const displayName = user?.name ?? (email ? email.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Admin');
@@ -93,6 +98,44 @@ export default function AdminDashboard() {
         if (!cancelled) setTotalBadges(0);
       });
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingWeekly(true);
+    adminApi
+      .getStatisticsSessionsByDay()
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) setWeeklyData(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setWeeklyData([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWeekly(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingActivity(true);
+    adminApi
+      .getStatisticsRecentActivity(25)
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data)) setActivityLogs(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setActivityLogs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingActivity(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const fetchPendingGames = async () => {
@@ -204,19 +247,17 @@ export default function AdminDashboard() {
     },
   ];
 
-  const weeklyData = DAYS.map((day) => ({ day, sessions: 0 }));
-  const activityLogs: { id: string; player: string; action: string; game: string; timestamp: string }[] = [];
+  const chartWeekly =
+    weeklyData.length > 0
+      ? weeklyData.map((d) => ({ day: d.day, sessions: Number(d.sessions) || 0 }))
+      : DAYS_FALLBACK.map((day) => ({ day, sessions: 0 }));
+
   const gameStats: { name: string; plays: number; avgScore: number; avgXp: number }[] = scoringDistribution.map((row) => ({
     name: row.gameTitle,
     plays: row.sessions,
     avgScore: Number(row.avgScore || 0),
     avgXp: Number(row.avgXp || 0),
   }));
-  const totalAnomalySessions = scoringDistribution.reduce((acc, row) => acc + Number(row.anomalySessions || 0), 0);
-  const weightedAvgAdjustmentDelta = scoringDistribution.length
-    ? scoringDistribution.reduce((acc, row) => acc + Number(row.avgAdjustmentDelta || 0), 0) / scoringDistribution.length
-    : 0;
-
   return (
     <div className="p-5 md:p-8 bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100 min-h-full">
       <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-100 via-slate-50 to-blue-50 p-6 md:p-8 mb-8 shadow-sm">
@@ -274,20 +315,26 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Activité hebdomadaire</h2>
-              <p className="text-sm text-slate-500">Sessions des 7 derniers jours</p>
+              <p className="text-sm text-slate-500">Sessions des 30 derniers jours</p>
             </div>
             <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-100">
               <TrendingUp className="w-5 h-5 text-emerald-600" />
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={weeklyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef2ff" />
-              <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip />
-              <Line type="monotone" dataKey="sessions" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} />
-            </LineChart>
+            {loadingWeekly ? (
+              <div className="flex h-[260px] items-center justify-center text-slate-500">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <LineChart data={chartWeekly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef2ff" />
+                <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="sessions" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            )}
           </ResponsiveContainer>
         </motion.div>
 
@@ -409,14 +456,6 @@ export default function AdminDashboard() {
               <p className="text-xs uppercase font-semibold text-amber-700 mb-1">Badges actifs</p>
               <p className="text-2xl font-extrabold text-amber-900">{totalBadges}</p>
             </div>
-            <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
-              <p className="text-xs uppercase font-semibold text-rose-700 mb-1">Sessions anormales</p>
-              <p className="text-2xl font-extrabold text-rose-900">{totalAnomalySessions}</p>
-            </div>
-            <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-4">
-              <p className="text-xs uppercase font-semibold text-sky-700 mb-1">Delta score moyen</p>
-              <p className="text-2xl font-extrabold text-sky-900">{weightedAvgAdjustmentDelta.toFixed(2)}</p>
-            </div>
           </div>
         </motion.div>
       </div>
@@ -445,22 +484,47 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {activityLogs.map((activity) => (
-                <tr key={activity.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-3 px-4 text-sm text-slate-900">{activity.player}</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      activity.action === 'Completed' ? 'bg-green-100 text-green-700' :
-                      activity.action === 'Started' ? 'bg-blue-100 text-blue-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {activity.action}
-                    </span>
+              {loadingActivity ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-slate-500">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
                   </td>
-                  <td className="py-3 px-4 text-sm text-slate-600">{activity.game}</td>
-                  <td className="py-3 px-4 text-sm text-slate-500">{activity.timestamp}</td>
                 </tr>
-              ))}
+              ) : activityLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-10 text-center text-sm text-slate-500">
+                    Aucune activité récente pour le moment.
+                  </td>
+                </tr>
+              ) : (
+                activityLogs.map((activity) => (
+                  <tr key={activity.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-3 px-4 text-sm text-slate-900">{activity.player}</td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          activity.action === 'Terminé'
+                            ? 'bg-green-100 text-green-700'
+                            : activity.action === 'En cours'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                        }`}
+                      >
+                        {activity.action}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600">{activity.game}</td>
+                    <td className="py-3 px-4 text-sm text-slate-500">
+                      {activity.occurredAt
+                        ? new Date(activity.occurredAt).toLocaleString('fr-FR', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })
+                        : '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

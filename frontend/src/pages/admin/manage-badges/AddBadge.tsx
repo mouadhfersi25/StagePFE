@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import type { CreateBadgeRequest, TypeConditionBadge } from '@/api/types/api.types';

@@ -9,11 +9,11 @@ import type {
   CreateMemoryCardRequest,
   UpdateMemoryCardRequest,
   EducatorDashboardStatsDTO,
+  EducatorLearningStatsDTO,
   GenerateQuizPreviewRequest,
   LogicPuzzleDTO,
   CreateLogicPuzzleRequest,
   UpdateLogicPuzzleRequest,
-  GenerateReflexSettingsPreviewRequest,
   ReflexSettingsDTO,
   CreateOrUpdateReflexSettingsRequest,
 } from '../types/api.types';
@@ -55,8 +55,24 @@ const educatorApi = {
   updateQuestion: (id: number, data: UpdateQuizQuestionRequest) =>
     api.put<QuizQuestionDTO>(EDUCATOR_ENDPOINTS.QUESTION_BY_ID(id), data),
   deleteQuestion: (id: number) => api.delete(EDUCATOR_ENDPOINTS.QUESTION_BY_ID(id)),
+  uploadQuestionMedia: (id: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<QuizQuestionDTO>(EDUCATOR_ENDPOINTS.QUESTION_MEDIA_UPLOAD(id), form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadQuestionPromptAudio: (id: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<QuizQuestionDTO>(EDUCATOR_ENDPOINTS.QUESTION_PROMPT_AUDIO_UPLOAD(id), form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   generateQuizPreview: (data: GenerateQuizPreviewRequest) =>
-    api.post<QuizQuestionDTO[]>(EDUCATOR_ENDPOINTS.QUESTIONS_AI_GENERATE_PREVIEW, data),
+    api.post<QuizQuestionDTO[]>(EDUCATOR_ENDPOINTS.QUESTIONS_AI_GENERATE_PREVIEW, data, {
+      timeout: 45000,
+    }),
   getLogicPuzzles: (gameId: number) =>
     api.get<LogicPuzzleDTO[]>(EDUCATOR_ENDPOINTS.LOGIC_PUZZLES, { params: { gameId } }),
   createLogicPuzzle: (data: CreateLogicPuzzleRequest) =>
@@ -69,8 +85,6 @@ const educatorApi = {
     api.get<ReflexSettingsDTO>(EDUCATOR_ENDPOINTS.REFLEX_SETTINGS, { params: { gameId } }),
   upsertReflexSettings: (data: CreateOrUpdateReflexSettingsRequest) =>
     api.put<ReflexSettingsDTO>(EDUCATOR_ENDPOINTS.REFLEX_SETTINGS, data),
-  generateReflexSettingsPreview: (data: GenerateReflexSettingsPreviewRequest) =>
-    api.post<ReflexSettingsDTO>(EDUCATOR_ENDPOINTS.REFLEX_SETTINGS_AI_GENERATE_PREVIEW, data),
 
   getMemoryCards: (gameId: number) =>
     api.get<MemoryCardDTO[]>(EDUCATOR_ENDPOINTS.MEMORY_CARDS, { params: { gameId } }),
@@ -81,6 +95,7 @@ const educatorApi = {
   deleteMemoryCard: (id: number) => api.delete(EDUCATOR_ENDPOINTS.MEMORY_CARD_BY_ID(id)),
 
   getDashboardStats: () => api.get<EducatorDashboardStatsDTO>(EDUCATOR_ENDPOINTS.DASHBOARD_STATS),
+  getLearningStats: () => api.get<EducatorLearningStatsDTO>(EDUCATOR_ENDPOINTS.LEARNING_STATS),
 };
 
 export default educatorApi;

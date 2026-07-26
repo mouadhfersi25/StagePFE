@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calendar, Edit, Loader2, Tag, Target, Zap, Clock, Gamepad2, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import adminApi from '@/api/admin';
 import educatorApi from '@/api/educator/educator.api';
-import type { GameDTO, EtatJeu, QuizQuestionDTO, MemoryCardDTO, GameAiReviewDTO } from '@/api/types';
+import type { GameDTO, EtatJeu, QuizQuestionDTO, MemoryCardDTO, GameAiReviewDTO, LogicPuzzleDTO, ReflexSettingsDTO } from '@/api/types';
 import RejectGameModal from '@/components/admin/RejectGameModal';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -55,6 +55,8 @@ export default function GameDetail() {
   const [contentLoading, setContentLoading] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestionDTO[]>([]);
   const [memoryCards, setMemoryCards] = useState<MemoryCardDTO[]>([]);
+  const [logicPuzzles, setLogicPuzzles] = useState<LogicPuzzleDTO[]>([]);
+  const [reflexSettings, setReflexSettings] = useState<ReflexSettingsDTO | null>(null);
   const [aiReview, setAiReview] = useState<GameAiReviewDTO | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -99,6 +101,7 @@ export default function GameDetail() {
       const res = await adminApi.updateGameStatus(game.id, status);
       setGame(res.data);
       toast.success(status === 'ACCEPTE' ? 'Jeu accepté' : 'Jeu refusé');
+      navigate('/admin/games');
     } catch (err) {
       toast.error('Erreur lors de la mise à jour du statut');
     } finally {
@@ -114,6 +117,7 @@ export default function GameDetail() {
       setGame(res.data);
       toast.success('Jeu refusé');
       setShowRejectModal(false);
+      navigate('/admin/games');
     } catch {
       toast.error('Erreur lors de la mise à jour du statut');
     } finally {
@@ -167,6 +171,9 @@ export default function GameDetail() {
         if (game.typeJeu === 'QUIZ') {
           const res = await adminApi.getGameQuestions(game.id);
           setQuizQuestions(Array.isArray(res.data) ? res.data : []);
+          setMemoryCards([]);
+          setLogicPuzzles([]);
+          setReflexSettings(null);
           if (!Array.isArray(res.data) || res.data.length === 0) {
             const fallback = await educatorApi.getQuestions(game.id);
             setQuizQuestions(Array.isArray(fallback.data) ? fallback.data : []);
@@ -174,13 +181,38 @@ export default function GameDetail() {
         } else if (game.typeJeu === 'MEMOIRE') {
           const res = await adminApi.getGameMemoryCards(game.id);
           setMemoryCards(Array.isArray(res.data) ? res.data : []);
+          setQuizQuestions([]);
+          setLogicPuzzles([]);
+          setReflexSettings(null);
           if (!Array.isArray(res.data) || res.data.length === 0) {
             const fallback = await educatorApi.getMemoryCards(game.id);
             setMemoryCards(Array.isArray(fallback.data) ? fallback.data : []);
           }
+        } else if (game.typeJeu === 'LOGIQUE') {
+          const res = await adminApi.getGameLogicPuzzles(game.id);
+          setLogicPuzzles(Array.isArray(res.data) ? res.data : []);
+          setQuizQuestions([]);
+          setMemoryCards([]);
+          setReflexSettings(null);
+          if (!Array.isArray(res.data) || res.data.length === 0) {
+            const fallback = await educatorApi.getLogicPuzzles(game.id);
+            setLogicPuzzles(Array.isArray(fallback.data) ? fallback.data : []);
+          }
+        } else if (game.typeJeu === 'REFLEXE') {
+          const res = await adminApi.getGameReflexSettings(game.id);
+          setReflexSettings(res.data ?? null);
+          setQuizQuestions([]);
+          setMemoryCards([]);
+          setLogicPuzzles([]);
+          if (!res.data) {
+            const fallback = await educatorApi.getReflexSettings(game.id);
+            setReflexSettings(fallback.data ?? null);
+          }
         } else {
           setQuizQuestions([]);
           setMemoryCards([]);
+          setLogicPuzzles([]);
+          setReflexSettings(null);
         }
       } catch (err: any) {
         const status = err?.response?.status;
@@ -428,8 +460,16 @@ export default function GameDetail() {
         </div>
       )}
 
-      <div className="mt-8 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-slate-900 mb-3">Contenu du jeu</h2>
+      <div className="mt-8 rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-slate-50/50 to-slate-100/60 shadow-sm p-5 md:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200/70 pb-3">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold text-slate-900">Contenu du jeu</h2>
+            <p className="text-xs md:text-sm text-slate-500 mt-0.5">Aperçu détaillé pour la validation admin</p>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+            {formatLabel(game.typeJeu)}
+          </span>
+        </div>
 
         {contentError && (
           <div className="mb-4 p-4 rounded-lg bg-rose-50 border border-rose-100 text-rose-700">
@@ -453,6 +493,24 @@ export default function GameDetail() {
                 Voir le contenu côté éducateur
               </button>
             )}
+            {game && game.typeJeu === 'LOGIQUE' && (
+              <button
+                type="button"
+                onClick={() => navigate(`/educator/games/logic/${game.id}/configure`)}
+                className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm"
+              >
+                Voir le contenu côté éducateur
+              </button>
+            )}
+            {game && game.typeJeu === 'REFLEXE' && (
+              <button
+                type="button"
+                onClick={() => navigate(`/educator/games/reflex/${game.id}/configure`)}
+                className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm"
+              >
+                Voir le contenu côté éducateur
+              </button>
+            )}
           </div>
         )}
 
@@ -466,19 +524,38 @@ export default function GameDetail() {
               <p className="text-slate-600">Aucune question de quiz n'a encore été ajoutée pour ce jeu.</p>
             ) : (
               quizQuestions.map((q, index) => (
-                <div key={q.id} className="p-4 rounded-xl border border-slate-100 bg-white">
-                  <p className="font-semibold text-sm">Question {index + 1}</p>
-                  <p className="mt-1 text-gray-700">{q.contenu}</p>
-                  <p className="text-xs text-gray-500 mt-1">Difficulté: {difficultyLabel(q.difficulte)}</p>
-                  <p className="text-sm mt-2"><strong>Bonne réponse :</strong> {q.bonneReponse}</p>
+                <div key={q.id} className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-slate-300">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-900">Question {index + 1}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                        {(q.sousType ?? 'DEFAULT').toUpperCase()}
+                      </span>
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        {difficultyLabel(q.difficulte)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-slate-700 leading-relaxed">{q.contenu}</p>
+                  {q.mediaUrl && (
+                    <div className="mt-3">
+                      <img src={q.mediaUrl} alt="media question" className="max-h-56 rounded-xl border border-slate-200 bg-slate-50 object-contain" />
+                    </div>
+                  )}
+                  {q.promptAudioUrl && (
+                    <div className="mt-3">
+                      <audio controls src={q.promptAudioUrl} className="w-full" />
+                    </div>
+                  )}
+                  <p className="mt-3 text-sm text-slate-700"><strong>Bonne réponse :</strong> {q.bonneReponse}</p>
                   {q.options && q.options.length > 0 && (
-                    <ul className="mt-1 list-disc pl-5 text-sm text-gray-700 space-y-1">
+                    <ul className="mt-2 list-disc pl-5 text-sm text-slate-700 space-y-1">
                       {q.options.map((option) => (
                         <li key={option}>{option}</li>
                       ))}
                     </ul>
                   )}
-                  {q.explication && <p className="text-sm text-gray-500 mt-2">Explication: {q.explication}</p>}
+                  {q.explication && <p className="text-sm text-slate-500 mt-2"><strong>Explication :</strong> {q.explication}</p>}
                 </div>
               ))
             )}
@@ -492,7 +569,7 @@ export default function GameDetail() {
                 const c1 = pair.cards[0];
                 const c2 = pair.cards[1];
                 return (
-                  <div key={pair.key} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                  <div key={pair.key} className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-slate-300">
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
@@ -503,7 +580,7 @@ export default function GameDetail() {
                           <p className="text-xs text-gray-500 truncate">Catégorie</p>
                         </div>
                       </div>
-                      <span className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                      <span className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700 font-medium">
                         {pair.categorie ?? '—'}
                       </span>
                     </div>
@@ -513,13 +590,24 @@ export default function GameDetail() {
                         <div
                           key={c ? c.id : `placeholder-${pair.key}-${i}`}
                           className={`w-20 h-20 rounded-xl border flex items-center justify-center ${
-                            c ? 'border-slate-200 bg-slate-50' : 'border-dashed border-slate-200 bg-white'
+                            c ? 'border-slate-200 bg-gradient-to-b from-white to-slate-50' : 'border-dashed border-slate-200 bg-white'
                           }`}
                         >
                           {c ? (
                             <div className="flex flex-col items-center leading-none">
-                              <span className="text-3xl">{c.symbole}</span>
+                              {c.cardType === 'IMAGE' && c.cardValue ? (
+                                <img src={c.cardValue} alt="memory-card" className="w-12 h-12 object-cover rounded-lg border border-slate-200" />
+                              ) : c.cardType === 'COLOR' && c.cardValue ? (
+                                <span className="w-8 h-8 rounded-full border-2 border-slate-300" style={{ backgroundColor: c.cardValue }} />
+                              ) : c.cardType === 'TEXT' && c.cardValue ? (
+                                <span className="text-xs font-semibold text-slate-700 text-center px-1 break-words max-w-[70px]">{c.cardValue}</span>
+                              ) : (
+                                <span className="text-3xl">{c.symbole}</span>
+                              )}
                               <span className="text-[10px] text-slate-500 mt-1">Carte {i + 1}</span>
+                              <span className="text-[9px] text-slate-400 mt-1">
+                                {(c.cardType ?? 'EMOJI').toUpperCase()}
+                              </span>
                             </div>
                           ) : (
                             <span className="text-[11px] text-slate-400">—</span>
@@ -530,6 +618,72 @@ export default function GameDetail() {
                   </div>
                 );
               })
+            )}
+          </div>
+        ) : game?.typeJeu === 'LOGIQUE' ? (
+          <div className="space-y-4">
+            {logicPuzzles.length === 0 ? (
+              <p className="text-slate-600">Aucun puzzle logique n'a encore été ajouté pour ce jeu.</p>
+            ) : (
+              logicPuzzles.map((puzzle, index) => (
+                <div key={puzzle.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-slate-300">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-900">Puzzle {index + 1}</p>
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-semibold">
+                      {formatLabel(puzzle.sousType ?? 'DEDUCTION')}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-slate-700 leading-relaxed">{puzzle.enonce}</p>
+                  <p className="text-xs text-slate-500 mt-2">Difficulté : {difficultyLabel(puzzle.difficulte)}</p>
+                  <p className="text-sm mt-2 text-slate-700"><strong>Bonne réponse :</strong> {puzzle.bonneReponse}</p>
+                  {puzzle.indice && <p className="text-sm text-slate-500 mt-1"><strong>Indice :</strong> {puzzle.indice}</p>}
+                  {puzzle.donnees && (
+                    <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5">
+                      <summary className="cursor-pointer text-sm font-medium text-slate-700">Données du puzzle</summary>
+                      <pre className="mt-2 text-xs bg-white border border-slate-200 rounded-lg p-3 overflow-auto whitespace-pre-wrap break-words text-slate-700">
+                        {puzzle.donnees}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        ) : game?.typeJeu === 'REFLEXE' ? (
+          <div className="space-y-3">
+            {!reflexSettings ? (
+              <p className="text-slate-600">Les paramètres réflexe n'ont pas encore été configurés pour ce jeu.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Modèle</p>
+                  <p className="font-semibold text-gray-900 mt-1">{formatLabel(reflexSettings.modeleReflexe)}</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Type de stimuli</p>
+                  <p className="font-semibold text-gray-900 mt-1">{formatLabel(reflexSettings.typeStimuli)}</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Nombre de rounds</p>
+                  <p className="font-semibold text-gray-900 mt-1">{reflexSettings.nombreRounds ?? '—'}</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Temps réaction max</p>
+                  <p className="font-semibold text-gray-900 mt-1">
+                    {reflexSettings.tempsReactionMaxMs != null ? `${reflexSettings.tempsReactionMaxMs} ms` : '—'}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">No-go ratio</p>
+                  <p className="font-semibold text-gray-900 mt-1">
+                    {reflexSettings.noGoRatio != null ? `${reflexSettings.noGoRatio}%` : '—'}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Nombre de cibles</p>
+                  <p className="font-semibold text-gray-900 mt-1">{reflexSettings.choiceTargetCount ?? '—'}</p>
+                </div>
+              </div>
             )}
           </div>
         ) : (

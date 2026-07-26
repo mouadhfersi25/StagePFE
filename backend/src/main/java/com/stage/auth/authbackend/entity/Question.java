@@ -25,6 +25,15 @@ public class Question {
     @Column(name = "options", columnDefinition = "TEXT")
     private String options;
 
+    @Column(name = "sous_type", length = 40)
+    private String sousType;
+
+    @Column(name = "media_url", columnDefinition = "TEXT")
+    private String mediaUrl;
+
+    @Column(name = "prompt_audio_url", columnDefinition = "TEXT")
+    private String promptAudioUrl;
+
     @Column(columnDefinition = "TEXT")
     private String explication;
 

@@ -10,6 +10,9 @@ export const AUTH_ENDPOINTS = {
 
 export const USER_ENDPOINTS = {
   ME: "/users/me",
+  LINKED_CHILDREN: "/users/me/linked-children",
+  LINKED_CHILD_HISTORY: (childId: number | string) => `/users/me/linked-children/${childId}/history`,
+  LINKED_CHILD_BADGES: (childId: number | string) => `/users/me/linked-children/${childId}/badges`,
   UPDATE_PROFILE: "/users/update-profile",
   CHANGE_PASSWORD: "/users/change-password",
   ONBOARDING: "/users/me/onboarding",
@@ -23,16 +26,19 @@ export const USER_ENDPOINTS = {
   REWARD_CLAIM: (rewardId: number | string) => `/users/rewards/${rewardId}/claim`,
   HISTORY_SESSIONS: "/users/history/sessions",
   LEADERBOARD_SOLO: "/users/leaderboard/solo",
-  LEADERBOARD_TEAM: "/users/leaderboard/team",
+  LEADERBOARD_SOLO_SCOPED: (scope: string) => `/users/leaderboard/solo/scoped?scope=${encodeURIComponent(scope)}`,
+  LEADERBOARD_ME_RANKS: "/users/leaderboard/me/ranks",
   ROOMS_CREATE: "/users/rooms/create",
   ROOMS_JOIN: "/users/rooms/join",
   ROOM_BY_CODE: (roomCode: string) => `/users/rooms/${roomCode}`,
+  ROOM_RESULT: (roomCode: string, gameId: number | string) =>
+    `/users/rooms/${roomCode}/result?gameId=${encodeURIComponent(String(gameId))}`,
   ROOM_READY: (roomCode: string) => `/users/rooms/${roomCode}/ready`,
   ROOM_START: (roomCode: string) => `/users/rooms/${roomCode}/start`,
-  ROOM_TEAM_NAME: (roomCode: string) => `/users/rooms/${roomCode}/team-name`,
   GAME_QUIZ_QUESTIONS: (gameId: number | string) => `/users/games/${gameId}/quiz-questions`,
   GAME_MEMORY_CARDS: (gameId: number | string) => `/users/games/${gameId}/memory-cards`,
   GAME_LOGIC_PUZZLES: (gameId: number | string) => `/users/games/${gameId}/logic-puzzles`,
+  RECLAMATIONS: "/users/reclamations",
 } as const;
 
 export const ADMIN_ENDPOINTS = {
@@ -41,8 +47,12 @@ export const ADMIN_ENDPOINTS = {
   SUSPEND_USER: (id: number | string) => `/admin/users/suspend/${id}`,
   REACTIVATE_USER: (id: number | string) => `/admin/users/reactivate/${id}`,
   USER_ROLE: (id: number | string) => `/admin/users/${id}/change-role`,
+  USER_PARENT_LINK: (id: number | string) => `/admin/users/${id}/parent-link`,
   ACTIVE_SESSIONS_COUNT: "/admin/users/sessions/active-count",
   SCORING_DISTRIBUTION: "/admin/users/scoring-distribution",
+  STATISTICS_SESSIONS_BY_DAY: "/admin/statistics/sessions-by-day",
+  STATISTICS_RECENT_ACTIVITY: "/admin/statistics/recent-activity",
+  STATISTICS_OVERVIEW: "/admin/statistics/overview",
   GAMES: "/admin/games",
   GAME_BY_ID: (id: number | string) => `/admin/games/${id}`,
   GAME_AI_REVIEW: (id: number | string) => `/admin/games/${id}/ai-review`,
@@ -50,8 +60,13 @@ export const ADMIN_ENDPOINTS = {
   GAME_QUESTIONS: (id: number | string) => `/admin/games/${id}/questions`,
 
   GAME_MEMORY_CARDS: (id: number | string) => `/admin/games/${id}/memory-cards`,
+  GAME_LOGIC_PUZZLES: (id: number | string) => `/admin/games/${id}/logic-puzzles`,
+  GAME_REFLEX_SETTINGS: (id: number | string) => `/admin/games/${id}/reflex-settings`,
   BADGES: "/admin/badges",
   BADGE_BY_ID: (id: number | string) => `/admin/badges/${id}`,
+  RECLAMATIONS: "/admin/reclamations",
+  RECLAMATION_BY_ID: (id: number | string) => `/admin/reclamations/${id}`,
+  RECLAMATIONS_PENDING_COUNT: "/admin/reclamations/pending-count",
 } as const;
 
 export const EDUCATOR_ENDPOINTS = {
@@ -64,13 +79,30 @@ export const EDUCATOR_ENDPOINTS = {
   GAME_SUBMIT: (id: number | string) => `/educator/games/${id}/submit`,
   QUESTIONS: "/educator/questions",
   QUESTION_BY_ID: (id: number | string) => `/educator/questions/${id}`,
+  QUESTION_MEDIA_UPLOAD: (id: number | string) => `/educator/questions/${id}/media/upload`,
+  QUESTION_PROMPT_AUDIO_UPLOAD: (id: number | string) => `/educator/questions/${id}/prompt-audio/upload`,
   QUESTIONS_AI_GENERATE_PREVIEW: "/educator/questions/ai/generate-preview",
   LOGIC_PUZZLES: "/educator/logic-puzzles",
   REFLEX_SETTINGS: "/educator/reflex-settings",
-  REFLEX_SETTINGS_AI_GENERATE_PREVIEW: "/educator/reflex-settings/ai/generate-preview",
   MEMORY_CARDS: "/educator/memory-cards",
   MEMORY_CARD_BY_ID: (id: number | string) => `/educator/memory-cards/${id}`,
   DASHBOARD_STATS: "/educator/dashboard/stats",
+  LEARNING_STATS: "/educator/statistics/learning",
+  VOICE_SERIES: "/educator/voice/series",
+  VOICE_SERIES_BY_ID: (id: number | string) => `/educator/voice/series/${id}`,
+  VOICE_SERIES_PUBLISH: (id: number | string) => `/educator/voice/series/${id}/publish`,
+  VOICE_SERIES_ARCHIVE: (id: number | string) => `/educator/voice/series/${id}/archive`,
+  VOICE_PROMPTS: "/educator/voice/prompts",
+  VOICE_PROMPT_BY_ID: (id: number | string) => `/educator/voice/prompts/${id}`,
+} as const;
+
+export const PLAYER_VOICE_ENDPOINTS = {
+  SERIES: "/player/voice/series",
+  SERIES_BY_ID: (id: number | string) => `/player/voice/series/${id}`,
+  SESSION_START: "/player/voice/sessions/start",
+  EVALUATE: "/player/voice/evaluate",
+  SESSION_COMPLETE: (id: number | string) => `/player/voice/sessions/${id}/complete`,
+  HISTORY: "/player/voice/history",
 } as const;
 
 export const SPONSOR_ENDPOINTS = {

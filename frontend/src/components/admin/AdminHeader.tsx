@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Globe, Bell, Settings, LogOut, Check, X, Gamepad2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context';
@@ -150,9 +150,9 @@ export default function AdminHeader() {
   return (
     <header className="fixed top-0 left-64 right-0 z-50 border-b border-violet-100/70 bg-white/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between gap-4 px-6 py-3.5">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">Administration</p>
-          <h2 className="text-sm md:text-base font-bold text-slate-900">Bonjour, {displayName}</h2>
+          <h2 className="text-sm md:text-base font-bold text-slate-900 truncate">Bonjour, {displayName}</h2>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors border border-transparent hover:border-slate-200" title="Langue">

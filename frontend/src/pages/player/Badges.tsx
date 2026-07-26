@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, CheckCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import userApi from '@/api/user/user.api';
@@ -25,6 +25,10 @@ export default function Badges() {
       setLoading(false);
     }
   };
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     void loadBadges();

@@ -121,7 +121,7 @@ public class EducatorLogicService {
         if (candidate == null || candidate.isBlank()) return "DEDUCTION";
         String normalized = candidate.trim().toUpperCase();
         return switch (normalized) {
-            case "SUITE_LOGIQUE", "INTRUS", "DEDUCTION" -> normalized;
+            case "SUITE_LOGIQUE", "INTRUS", "DEDUCTION", "COLOR_MATCH" -> normalized;
             default -> "DEDUCTION";
         };
     }

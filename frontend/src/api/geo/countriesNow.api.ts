@@ -4,10 +4,6 @@
  */
 import api from "../config/axiosConfig";
 
-export interface Country {
-  name: string;
-}
-
 const geoApi = {
   getCountries: async (): Promise<{ name: string }[]> => {
     const res = await api.get<{ name: string }[]>("/countriesnow/countries");

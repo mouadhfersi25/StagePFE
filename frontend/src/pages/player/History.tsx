@@ -1,26 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
-import { ArrowLeft, CheckCircle, XCircle, Clock, Target, Users, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Clock, Target, Users, User, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import userApi from '@/api/user/user.api';
+import playerVoiceApi from '@/api/player/playerVoice.api';
 import type { PlayerHistorySessionDTO } from '@/api/types/api.types';
+import type { PlayerOralHistorySessionDTO } from '@/api/types/voice.types';
 import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
 
 export default function History() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<PlayerHistorySessionDTO[]>([]);
+  const [oralSessions, setOralSessions] = useState<PlayerOralHistorySessionDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    userApi.getHistorySessions()
-      .then((res) => {
-        if (!cancelled) setSessions(Array.isArray(res.data) ? res.data : []);
+    Promise.all([
+      userApi.getHistorySessions(),
+      playerVoiceApi.getHistory(),
+    ])
+      .then(([gamesRes, oralRes]) => {
+        if (!cancelled) {
+          setSessions(Array.isArray(gamesRes.data) ? gamesRes.data : []);
+          setOralSessions(Array.isArray(oralRes.data) ? oralRes.data : []);
+        }
       })
       .catch(() => {
-        if (!cancelled) setSessions([]);
+        if (!cancelled) {
+          setSessions([]);
+          setOralSessions([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -28,7 +40,6 @@ export default function History() {
     return () => { cancelled = true; };
   }, []);
 
-  const gamesWon = useMemo(() => sessions.filter((s) => Boolean(s.reussite)).length, [sessions]);
   const avgScore = useMemo(
     () => Math.round(sessions.length ? sessions.reduce((sum, s) => sum + (s.scoreFinal ?? 0), 0) / sessions.length : 0),
     [sessions]
@@ -91,27 +102,10 @@ export default function History() {
           <p className="text-white/85 text-sm">Suivi de toutes tes sessions avec métriques détaillées.</p>
         </motion.div>
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <p className="text-sm text-slate-300">Games Won</p>
-            </div>
-            <p className="text-3xl font-bold text-white">
-              {gamesWon}
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
             className="bg-white/5 rounded-2xl p-6 border border-white/15 backdrop-blur-xl"
           >
             <div className="flex items-center gap-3 mb-2">
@@ -168,9 +162,6 @@ export default function History() {
                     Mode
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                    Result
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
                     Accuracy
                   </th>
                 </tr>
@@ -219,19 +210,6 @@ export default function History() {
                         )}
                         <span className="text-sm text-slate-200">{session.mode}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {session.reussite ? (
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                          <span className="text-sm font-semibold text-green-600">Win</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <XCircle className="w-5 h-5 text-red-600" />
-                          <span className="text-sm font-semibold text-red-600">Lose</span>
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4">
                       {session.accuracy != null ? (
@@ -283,6 +261,46 @@ export default function History() {
             >
               Play Your First Game
             </motion.button>
+          </motion.div>
+        )}
+
+        {oralSessions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-white/5 rounded-2xl border border-white/15 overflow-hidden backdrop-blur-xl mt-8"
+          >
+            <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2">
+              <Mic className="w-5 h-5 text-rose-300" />
+              <h3 className="text-lg font-bold text-white">Atelier oral</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-white/5 border-b border-white/10">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase">Série</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase">Durée</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase">Score</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase">Précision</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {oralSessions.map((session) => (
+                    <tr key={session.sessionId} className="hover:bg-white/5">
+                      <td className="px-6 py-4 text-sm text-white">{session.seriesTitle}</td>
+                      <td className="px-6 py-4 text-sm text-slate-300">
+                        {session.dateFin ? format(new Date(session.dateFin), 'dd MMM yyyy HH:mm') : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-300">{formatDuration(session.durationSeconds)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-cyan-300">{session.scoreFinal ?? 0}</td>
+                      <td className="px-6 py-4 text-sm text-emerald-300">{session.accuracyPercent ?? 0}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
         )}
       </div>

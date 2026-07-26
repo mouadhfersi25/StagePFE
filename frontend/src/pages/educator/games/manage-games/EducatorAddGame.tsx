@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Save, Loader2, Sparkles, Upload } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import educatorApi from '@/api/educator/educator.api';
-import type { TypeJeu, ModeJeu } from '@/api/types';
+import type { TypeJeu, ModeJeu, QuizPlayMode, QuizVariant } from '@/api/types';
+import QuizVariantPicker from '@/components/educator/QuizVariantPicker';
 import EducatorSidebar from '@/components/educator/EducatorSidebar';
 import EducatorHeader from '@/components/educator/EducatorHeader';
+import { InputField, SelectField, TextareaField } from '@/components/forms/FormFields';
 import {
   validateRequired,
   validateInteger,
@@ -14,6 +16,7 @@ import {
   runValidations,
   type ValidationResult,
 } from '@/utils/formValidation';
+import { dataUrlToImageFile } from '@/utils/dataUrlToImageFile';
 
 const ICONS = ['🎮', '🧮', '🧠', '🎯', '⚡', '🔬', '🦁', '🌟', '🚀', '🎨'];
 
@@ -66,6 +69,13 @@ const normalizeFormType = (value: string): string => {
   return '';
 };
 
+const getPostCreateConfigurationPath = (typeJeu: TypeJeu, gameId: number): string => {
+  if (typeJeu === 'QUIZ') return `/educator/games/quiz/${gameId}/questions`;
+  if (typeJeu === 'MEMOIRE') return `/educator/games/memory/${gameId}/configure`;
+  if (typeJeu === 'LOGIQUE') return `/educator/games/logic/${gameId}/configure`;
+  return `/educator/games/reflex/${gameId}/configure`;
+};
+
 export default function EducatorAddGame() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -84,6 +94,8 @@ export default function EducatorAddGame() {
     coverImageUrl: string;
     generateAiCover: boolean;
     actif: boolean;
+    quizPlayMode: QuizPlayMode;
+    quizVariant: QuizVariant;
   }>({
     title: '',
     description: '',
@@ -97,6 +109,8 @@ export default function EducatorAddGame() {
     coverImageUrl: '',
     generateAiCover: true,
     actif: false,
+    quizPlayMode: 'CLASSIC',
+    quizVariant: 'DEFAULT',
   });
 
   const activePlaceholders = {
@@ -160,6 +174,9 @@ export default function EducatorAddGame() {
     if (!validate()) return;
     setSubmitting(true);
     try {
+      const coverTrim = formData.coverImageUrl.trim();
+      const isDataUrlCover = coverTrim.startsWith('data:image/');
+
       const created = await educatorApi.createGame({
         titre: formData.title.trim(),
         description: formData.description.trim() || undefined,
@@ -170,25 +187,43 @@ export default function EducatorAddGame() {
         modeJeu: formData.mode,
         dureeMinutes: parseInt(formData.estimatedTime, 10) || 15,
         icone: formData.icon || undefined,
-        coverImageUrl: formData.coverImageUrl.trim() || undefined,
+        // Ne pas envoyer une data URL en JSON (très lourd) : création légère puis upload multipart.
+        coverImageUrl: isDataUrlCover ? undefined : coverTrim || undefined,
         actif: formData.actif,
+        quizPlayMode: formData.type === 'quiz' ? formData.quizPlayMode : 'CLASSIC',
+        quizVariant: formData.type === 'quiz' ? formData.quizVariant : 'DEFAULT',
       });
 
-      if (formData.generateAiCover && created?.data?.id) {
+      const gameId = created?.data?.id;
+
+      if (gameId && isDataUrlCover && coverTrim) {
         try {
-          const coverRes = await educatorApi.generateGameCover(created.data.id);
-          const newCover = coverRes.data?.coverImageUrl ?? '';
-          if (newCover) {
-            await educatorApi.updateGame(created.data.id, { coverImageUrl: newCover });
+          const file = await dataUrlToImageFile(coverTrim);
+          if (file) {
+            await educatorApi.uploadGameCover(gameId, file);
+          } else {
+            toast.warning('Jeu créé ; la cover n’a pas pu être envoyée. Réessayez depuis la fiche du jeu.');
           }
+        } catch {
+          toast.warning('Jeu créé ; échec de l’envoi de la cover. Réessayez depuis la fiche du jeu.');
+        }
+      }
+
+      // Génération post-création seulement s’il n’y a aucune cover (sinon doublon IA + attente inutile).
+      if (formData.generateAiCover && gameId && !coverTrim) {
+        try {
+          await educatorApi.generateGameCover(gameId);
         } catch {
           toast.warning("Jeu créé, mais la génération automatique de cover a échoué.");
         }
       }
 
-      toast.success('Jeu créé avec succès ! Il sera visible après validation par l\'administrateur.');
-      if (FORM_TYPE_TO_TYPE_JEU[formData.type] === 'REFLEXE' && created?.data?.id) {
-        navigate(`/educator/games/reflex/${created.data.id}/configure`, { state: { autoGenerateAi: true } });
+      const createdId = created?.data?.id;
+      const createdType = FORM_TYPE_TO_TYPE_JEU[formData.type];
+      toast.success('Jeu créé avec succès ! Passez à la configuration du contenu.');
+      if (createdId && createdType) {
+        const nextPath = getPostCreateConfigurationPath(createdType, createdId);
+        navigate(nextPath);
       } else {
         navigate('/educator/games/manage');
       }
@@ -299,28 +334,27 @@ export default function EducatorAddGame() {
                   Infos générales
                 </h2>
                 <div className="space-y-5">
-                  <div>
-                    <label className={labelClass}>Titre du jeu *</label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setErrors((p) => ({ ...p, title: '' })); }}
-                      className={`${inputClass} ${errors.title ? 'border-red-500' : ''}`}
-                      placeholder={activePlaceholders.title}
-                    />
-                    {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Description du jeu *</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
-                      className={`${inputClass} min-h-[120px] resize-y ${errors.description ? 'border-red-500' : ''}`}
-                      placeholder={activePlaceholders.description}
-                      rows={4}
-                    />
-                    {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
-                  </div>
+                  <InputField
+                    label="Titre du jeu"
+                    required
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => { setFormData({ ...formData, title: e.target.value }); setErrors((p) => ({ ...p, title: '' })); }}
+                    inputClassName={inputClass}
+                    placeholder={activePlaceholders.title}
+                    error={errors.title}
+                  />
+                  <TextareaField
+                    label="Description du jeu"
+                    required
+                    value={formData.description}
+                    onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setErrors((p) => ({ ...p, description: '' })); }}
+                    className="min-h-[120px] resize-y"
+                    inputClassName={inputClass}
+                    placeholder={activePlaceholders.description}
+                    rows={4}
+                    error={errors.description}
+                  />
                 </div>
               </section>
 
@@ -329,48 +363,56 @@ export default function EducatorAddGame() {
                   Type & paramètres
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
-                  <div>
-                    <label className={labelClass}>Type de jeu *</label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => { setFormData({ ...formData, type: e.target.value }); setErrors((p) => ({ ...p, type: '' })); }}
-                      className={`${inputClass} ${errors.type ? 'border-red-500' : ''}`}
-                    >
+                  <SelectField
+                    label="Type de jeu"
+                    required
+                    value={formData.type}
+                    onChange={(e) => { setFormData({ ...formData, type: e.target.value }); setErrors((p) => ({ ...p, type: '' })); }}
+                    inputClassName={inputClass}
+                    error={errors.type}
+                  >
                       <option value="">— Choisir —</option>
                       <option value="quiz">Quiz</option>
                       <option value="memory">Memory</option>
                       <option value="logic">Logic</option>
                       <option value="reflex">Reflex</option>
-                    </select>
-                    {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Mode de jeu *</label>
-                    <select
-                      value={formData.mode}
-                      onChange={(e) => { setFormData({ ...formData, mode: e.target.value as ModeJeu | '' }); setErrors((p) => ({ ...p, mode: '' })); }}
-                      className={`${inputClass} ${errors.mode ? 'border-red-500' : ''}`}
-                    >
+                  </SelectField>
+                  <SelectField
+                    label="Mode de jeu"
+                    required
+                    value={formData.mode}
+                    onChange={(e) => { setFormData({ ...formData, mode: e.target.value as ModeJeu | '' }); setErrors((p) => ({ ...p, mode: '' })); }}
+                    inputClassName={inputClass}
+                    error={errors.mode}
+                  >
                       <option value="">— Choisir —</option>
                       <option value="INDIVIDUEL">Individuel</option>
-                      <option value="COLLECTIF">Collectif</option>
-                    </select>
-                    {errors.mode && <p className="mt-1 text-sm text-red-600">{errors.mode}</p>}
-                  </div>
-                  <div>
-                    <label className={labelClass}>Difficulté *</label>
-                    <select
-                      value={formData.difficulty}
-                      onChange={(e) => { setFormData({ ...formData, difficulty: e.target.value }); setErrors((p) => ({ ...p, difficulty: '' })); }}
-                      className={`${inputClass} ${errors.difficulty ? 'border-red-500' : ''}`}
+                      <option value="EN_LIGNE">En ligne · chacun pour soi</option>
+                  </SelectField>
+                  {formData.type === 'quiz' && (
+                    <SelectField
+                      label="Mode de partie"
+                      value={formData.quizPlayMode}
+                      onChange={(e) => setFormData({ ...formData, quizPlayMode: e.target.value as QuizPlayMode })}
+                      inputClassName={inputClass}
                     >
+                      <option value="CLASSIC">Classique</option>
+                      <option value="BLITZ_60S">Blitz 60 secondes</option>
+                    </SelectField>
+                  )}
+                  <SelectField
+                    label="Difficulté"
+                    required
+                    value={formData.difficulty}
+                    onChange={(e) => { setFormData({ ...formData, difficulty: e.target.value }); setErrors((p) => ({ ...p, difficulty: '' })); }}
+                    inputClassName={inputClass}
+                    error={errors.difficulty}
+                  >
                       <option value="">— Choisir —</option>
                       <option value="Easy">Facile</option>
                       <option value="Medium">Moyen</option>
                       <option value="Hard">Difficile</option>
-                    </select>
-                    {errors.difficulty && <p className="mt-1 text-sm text-red-600">{errors.difficulty}</p>}
-                  </div>
+                  </SelectField>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
@@ -407,6 +449,16 @@ export default function EducatorAddGame() {
                     {errors.estimatedTime && <p className="mt-1 text-sm text-red-600">{errors.estimatedTime}</p>}
                   </div>
                 </div>
+
+                {formData.type === 'quiz' && (
+                  <div className="mt-6 pt-6 border-t border-gray-100">
+                    <QuizVariantPicker
+                      value={formData.quizVariant}
+                      onChange={(quizVariant) => setFormData((prev) => ({ ...prev, quizVariant }))}
+                      disabled={submitting}
+                    />
+                  </div>
+                )}
 
                 {formData.type === 'reflex' && (
                   <div className="mt-5 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4 text-sm text-cyan-900">
@@ -464,11 +516,11 @@ export default function EducatorAddGame() {
                     </label>
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={formData.coverImageUrl}
                     onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
                     className={inputClass}
-                    placeholder="https://..."
+                    placeholder="URL ou data URL après génération / upload"
                   />
                   {formData.coverImageUrl && (
                     <img

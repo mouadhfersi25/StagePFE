@@ -19,6 +19,9 @@ public class MemoryCardDTO {
     private String jeuTitre;
 
     private String symbole;
+    private String cardType;
+    private String cardValue;
+    private String sousType;
     private String pairKey;
     private String categorie;
 }

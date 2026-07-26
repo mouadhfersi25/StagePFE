@@ -1,65 +1,73 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import BodyClassSync from "./BodyClassSync";
-import Home from "../pages/Home/Home";
-import Register from "../pages/auth/Register/Register";
-import Login from "../pages/auth/Login/Login";
-import Verify from "../pages/auth/Verify/Verify";
-import ForgotPassword from "../pages/auth/ForgotPassword/ForgotPassword";
-import ResetPassword from "../pages/auth/ResetPassword/ResetPassword";
-import AdminEditMyProfile from "../pages/admin/profile/AdminEditMyProfile";
 import AdminLayout from "../components/admin/AdminLayout";
 import PublicRoute from "./PublicRoute";
 import PrivateRoute from "./PrivateRoute";
 import AdminRoute from "./AdminRoute";
 import SponsorRoute from "./SponsorRoute";
-import AdminDashboard from "../pages/admin/dashboard/AdminDashboard";
-import Players from "../pages/admin/manage-users/Players";
-import PlayerDetail from "../pages/admin/manage-users/PlayerDetail";
-import EditPlayer from "../pages/admin/manage-users/EditPlayer";
-import Games from "../pages/admin/manage-games/Games";
-import GameDetail from "../pages/admin/manage-games/GameDetail";
-import AddGame from "../pages/admin/manage-games/AddGame";
-import EditGame from "../pages/admin/manage-games/EditGame";
-import AdminBadges from "../pages/admin/manage-badges/Badges";
-import AddBadge from "../pages/admin/manage-badges/AddBadge";
-import EditBadge from "../pages/admin/manage-badges/EditBadge";
-import Moderation from "../pages/admin/moderation/Moderation";
-import Statistics from "../pages/admin/statistics/Statistics";
-import EducatorDashboard from "../pages/educator/dashboard/EducatorDashboard";
-import AddQuestion from "../pages/educator/questions/AddQuestion";
-import EditQuestion from "../pages/educator/questions/EditQuestion";
-import EducatorGames from "../pages/educator/games/EducatorGames";
-import EducatorManageGames from "../pages/educator/games/manage-games/EducatorManageGames";
-import EducatorAddGame from "../pages/educator/games/manage-games/EducatorAddGame";
-import EducatorEditGame from "../pages/educator/games/manage-games/EducatorEditGame";
-import EducatorViewGame from "../pages/educator/games/manage-games/EducatorViewGame";
-import EducatorGameTypeSection from "../pages/educator/games/manage-games/EducatorGameTypeSection";
-import GameQuestions from "../pages/educator/questions/GameQuestions";
-import ViewQuestion from "../pages/educator/questions/ViewQuestion";
-import ConfigureMemoryGame from "../pages/educator/games/ConfigureMemoryGame";
-import ConfigureReflexGame from "../pages/educator/games/ConfigureReflexGame";
-import ConfigureLogicGame from "../pages/educator/games/ConfigureLogicGame";
-import EducatorStatistics from "../pages/educator/statistics/EducatorStatistics";
-import EducatorManageProfile from "../pages/educator/profile/EducatorManageProfile";
-import PlayerDashboard from "../pages/player/PlayerDashboard";
-import NewGame from "../pages/player/NewGame";
-import WaitingRoom from "../pages/player/WaitingRoom";
-import QuizGame from "../pages/player/games/QuizGame";
-import MemoryGame from "../pages/player/games/MemoryGame";
-import LogicGame from "../pages/player/games/LogicGame";
-import ReflexGame from "../pages/player/games/ReflexGame";
-import GameResult from "../pages/player/GameResult";
-import PlayerProgress from "../pages/player/Progress";
-import PlayerHistory from "../pages/player/History";
-import PlayerBadges from "../pages/player/Badges";
-import PlayerRewards from "../pages/player/Rewards";
-import PlayerProfile from "../pages/player/Profile";
-import PlayerRanking from "../pages/player/Ranking";
-import ParentDashboard from "../pages/parent/ParentDashboard";
-import ChildProgress from "../pages/parent/ChildProgress";
-import ParentAnalytics from "../pages/parent/Analytics";
-import SponsorDashboard from "../pages/sponsor/SponsorDashboard";
+
+const Home = lazy(() => import("../pages/Home/Home"));
+const Register = lazy(() => import("../pages/auth/Register/Register"));
+const Login = lazy(() => import("../pages/auth/Login/Login"));
+const Verify = lazy(() => import("../pages/auth/Verify/Verify"));
+const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/auth/ResetPassword/ResetPassword"));
+const AdminEditMyProfile = lazy(() => import("../pages/admin/profile/AdminEditMyProfile"));
+const AdminDashboard = lazy(() => import("../pages/admin/dashboard/AdminDashboard"));
+const Players = lazy(() => import("../pages/admin/manage-users/Players"));
+const PlayerDetail = lazy(() => import("../pages/admin/manage-users/PlayerDetail"));
+const EditPlayer = lazy(() => import("../pages/admin/manage-users/EditPlayer"));
+const Games = lazy(() => import("../pages/admin/manage-games/Games"));
+const GameDetail = lazy(() => import("../pages/admin/manage-games/GameDetail"));
+const AddGame = lazy(() => import("../pages/admin/manage-games/AddGame"));
+const EditGame = lazy(() => import("../pages/admin/manage-games/EditGame"));
+const AdminBadges = lazy(() => import("../pages/admin/manage-badges/Badges"));
+const AddBadge = lazy(() => import("../pages/admin/manage-badges/AddBadge"));
+const EditBadge = lazy(() => import("../pages/admin/manage-badges/EditBadge"));
+const Moderation = lazy(() => import("../pages/admin/moderation/Moderation"));
+const Statistics = lazy(() => import("../pages/admin/statistics/Statistics"));
+const EducatorDashboard = lazy(() => import("../pages/educator/dashboard/EducatorDashboard"));
+const AddQuestion = lazy(() => import("../pages/educator/questions/AddQuestion"));
+const EditQuestion = lazy(() => import("../pages/educator/questions/EditQuestion"));
+const EducatorGames = lazy(() => import("../pages/educator/games/EducatorGames"));
+const EducatorManageGames = lazy(() => import("../pages/educator/games/manage-games/EducatorManageGames"));
+const EducatorAddGame = lazy(() => import("../pages/educator/games/manage-games/EducatorAddGame"));
+const EducatorEditGame = lazy(() => import("../pages/educator/games/manage-games/EducatorEditGame"));
+const EducatorViewGame = lazy(() => import("../pages/educator/games/manage-games/EducatorViewGame"));
+const EducatorGameTypeSection = lazy(() => import("../pages/educator/games/manage-games/EducatorGameTypeSection"));
+const GameQuestions = lazy(() => import("../pages/educator/questions/GameQuestions"));
+const ViewQuestion = lazy(() => import("../pages/educator/questions/ViewQuestion"));
+const ConfigureMemoryGame = lazy(() => import("../pages/educator/games/ConfigureMemoryGame"));
+const ConfigureReflexGame = lazy(() => import("../pages/educator/games/ConfigureReflexGame"));
+const ConfigureLogicGame = lazy(() => import("../pages/educator/games/ConfigureLogicGame"));
+const EducatorStatistics = lazy(() => import("../pages/educator/statistics/EducatorStatistics"));
+const VoiceSeriesList = lazy(() => import("../pages/educator/voice/VoiceSeriesList"));
+const VoiceSeriesEditor = lazy(() => import("../pages/educator/voice/VoiceSeriesEditor"));
+const EducatorManageProfile = lazy(() => import("../pages/educator/profile/EducatorManageProfile"));
+const PlayerDashboard = lazy(() => import("../pages/player/PlayerDashboard"));
+const NewGame = lazy(() => import("../pages/player/NewGame"));
+const WaitingRoom = lazy(() => import("../pages/player/WaitingRoom"));
+const QuizGame = lazy(() => import("../pages/player/games/QuizGame"));
+const MemoryGame = lazy(() => import("../pages/player/games/MemoryGame"));
+const LogicGame = lazy(() => import("../pages/player/games/LogicGame"));
+const ReflexGame = lazy(() => import("../pages/player/games/ReflexGame"));
+const VoiceCatalog = lazy(() => import("../pages/player/voice/VoiceCatalog"));
+const VoicePractice = lazy(() => import("../pages/player/voice/VoicePractice"));
+const VoiceResult = lazy(() => import("../pages/player/voice/VoiceResult"));
+const GameResult = lazy(() => import("../pages/player/GameResult"));
+const PlayerProgress = lazy(() => import("../pages/player/Progress"));
+const PlayerHistory = lazy(() => import("../pages/player/History"));
+const PlayerBadges = lazy(() => import("../pages/player/Badges"));
+const PlayerRewards = lazy(() => import("../pages/player/Rewards"));
+const PlayerProfile = lazy(() => import("../pages/player/Profile"));
+const PlayerRanking = lazy(() => import("../pages/player/Ranking"));
+const ParentDashboard = lazy(() => import("../pages/parent/ParentDashboard"));
+const ChildProgress = lazy(() => import("../pages/parent/ChildProgress"));
+const ParentAnalytics = lazy(() => import("../pages/parent/Analytics"));
+const ParentBadges = lazy(() => import("../pages/parent/ParentBadges"));
+const ParentHistory = lazy(() => import("../pages/parent/ParentHistory"));
+const SponsorDashboard = lazy(() => import("../pages/sponsor/SponsorDashboard"));
 
 function ScrollToTopOnRouteChange() {
   const location = useLocation();
@@ -76,6 +84,7 @@ function AppRoutes() {
     <BrowserRouter>
       <BodyClassSync />
       <ScrollToTopOnRouteChange />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-600">Chargement...</div>}>
       <Routes>
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -113,6 +122,9 @@ function AppRoutes() {
         <Route path="/educator/games/reflex/:gameId/configure" element={<PrivateRoute><ConfigureReflexGame /></PrivateRoute>} />
         <Route path="/educator/games/logic/:gameId/configure" element={<PrivateRoute><ConfigureLogicGame /></PrivateRoute>} />
         <Route path="/educator/statistics" element={<PrivateRoute><EducatorStatistics /></PrivateRoute>} />
+        <Route path="/educator/voice/series" element={<PrivateRoute><VoiceSeriesList /></PrivateRoute>} />
+        <Route path="/educator/voice/series/add" element={<PrivateRoute><VoiceSeriesEditor /></PrivateRoute>} />
+        <Route path="/educator/voice/series/:id/edit" element={<PrivateRoute><VoiceSeriesEditor /></PrivateRoute>} />
         <Route path="/educator/profile" element={<PrivateRoute><EducatorManageProfile /></PrivateRoute>} />
         <Route path="/player/dashboard" element={<PrivateRoute><PlayerDashboard /></PrivateRoute>} />
         <Route path="/player/new-game" element={<PrivateRoute><NewGame /></PrivateRoute>} />
@@ -121,6 +133,9 @@ function AppRoutes() {
         <Route path="/player/game/memory/:gameId" element={<PrivateRoute><MemoryGame /></PrivateRoute>} />
         <Route path="/player/game/logic/:gameId" element={<PrivateRoute><LogicGame /></PrivateRoute>} />
         <Route path="/player/game/reflex/:gameId" element={<PrivateRoute><ReflexGame /></PrivateRoute>} />
+        <Route path="/player/voice" element={<PrivateRoute><VoiceCatalog /></PrivateRoute>} />
+        <Route path="/player/voice/result" element={<PrivateRoute><VoiceResult /></PrivateRoute>} />
+        <Route path="/player/voice/:seriesId" element={<PrivateRoute><VoicePractice /></PrivateRoute>} />
         <Route path="/player/game-result" element={<PrivateRoute><GameResult /></PrivateRoute>} />
         <Route path="/player/progress" element={<PrivateRoute><PlayerProgress /></PrivateRoute>} />
         <Route path="/player/history" element={<PrivateRoute><PlayerHistory /></PrivateRoute>} />
@@ -131,11 +146,12 @@ function AppRoutes() {
         <Route path="/parent/dashboard" element={<PrivateRoute><ParentDashboard /></PrivateRoute>} />
         <Route path="/parent/child-progress" element={<PrivateRoute><ChildProgress /></PrivateRoute>} />
         <Route path="/parent/analytics" element={<PrivateRoute><ParentAnalytics /></PrivateRoute>} />
-        <Route path="/parent/badges" element={<PrivateRoute><PlayerBadges /></PrivateRoute>} />
-        <Route path="/parent/history" element={<PrivateRoute><PlayerHistory /></PrivateRoute>} />
+        <Route path="/parent/badges" element={<PrivateRoute><ParentBadges /></PrivateRoute>} />
+        <Route path="/parent/history" element={<PrivateRoute><ParentHistory /></PrivateRoute>} />
         <Route path="/sponsor/dashboard" element={<SponsorRoute><SponsorDashboard /></SponsorRoute>} />
         <Route path="/" element={<Home />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

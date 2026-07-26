@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import {
@@ -11,9 +11,12 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/context';
-import { useNavigate } from 'react-router';
 import storage from '@/utils/storage';
 import { userService } from '@/services/user.service';
+import adminApi from '@/api/admin';
+
+/** Fichier dans `public/logo-edugame.png` — modifiez le nom ici si besoin. */
+const LOGO_SRC = '/logo-edugame.png';
 
 interface NavItem {
   name: string;
@@ -32,6 +35,7 @@ const navItems: NavItem[] = [
 
 export default function AdminSidebar() {
   const [profileName, setProfileName] = useState<{ prenom: string; nom: string }>({ prenom: '', nom: '' });
+  const [pendingReclamations, setPendingReclamations] = useState(0);
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -74,23 +78,42 @@ export default function AdminSidebar() {
     navigate('/login');
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .getReclamationsPendingCount()
+      .then((res) => {
+        if (!cancelled) setPendingReclamations(Number(res.data?.count ?? 0));
+      })
+      .catch(() => {
+        if (!cancelled) setPendingReclamations(0);
+      });
+    return () => { cancelled = true; };
+  }, [location.pathname]);
+
   return (
     <div className="sticky top-0 w-64 h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-violet-950 border-r border-violet-900/60 flex flex-col shrink-0 shadow-2xl shadow-slate-900/20">
-      {/* Logo / Brand */}
-      <div className="p-6 shrink-0 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-fuchsia-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-900/40">
-            <span className="text-2xl">🛡️</span>
-          </div>
-          <div>
-            <h2 className="font-bold text-white">Admin Panel</h2>
-            <p className="text-xs text-violet-200">EduGame AI</p>
-          </div>
-        </div>
+      {/*
+        Zone logo — paddings à régler ici sur ce div :
+        pt-* pb-* px-* (pt-0 = collé en haut du sidebar).
+        Sur l’<img> ci‑dessous : max-h-* / marges via className pour la taille du visuel.
+      */}
+      <div className="shrink-0 px-3 pb-0 pt-0 leading-none">
+        <Link
+          to="/admin/dashboard"
+          className="mx-auto flex w-full flex-col items-center justify-start rounded-xl px-0 py-0 leading-none outline-none transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400/80"
+          aria-label="Administration — retour au tableau de bord"
+        >
+          <img
+            src={LOGO_SRC}
+            alt="EduGame"
+            className="m-0 block h-auto max-h-[118px] w-auto max-w-[248px] object-contain object-top drop-shadow-[0_4px_28px_rgba(0,0,0,0.45)]"
+          />
+        </Link>
       </div>
 
-      {/* Navigation — scroll si trop d’éléments */}
-      <nav className="flex-1 min-h-0 px-3 overflow-y-auto py-3">
+      {/* Navigation — -mt-* remonte le menu vers le logo (PNG avec transparence sous le texte) */}
+      <nav className="-mt-5 flex-1 min-h-0 px-4 overflow-y-auto pb-4 pt-0">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -104,7 +127,12 @@ export default function AdminSidebar() {
                 }`}
               >
                 {item.icon}
-                <span className="font-medium text-sm">{item.name}</span>
+                <span className="font-medium text-sm flex-1">{item.name}</span>
+                {item.path === '/admin/moderation' && pendingReclamations > 0 ? (
+                  <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center">
+                    {pendingReclamations > 99 ? '99+' : pendingReclamations}
+                  </span>
+                ) : null}
               </motion.div>
             </Link>
           );
@@ -112,7 +140,7 @@ export default function AdminSidebar() {
       </nav>
 
       {/* User profile block — toujours visible en bas sans scroller */}
-      <div className="shrink-0 p-3 border-t border-white/10">
+      <div className="shrink-0 border-t border-white/10 px-4 pb-4 pt-3">
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-fuchsia-500 to-cyan-500 flex items-center justify-center text-white font-semibold text-sm shrink-0">
             {initials}

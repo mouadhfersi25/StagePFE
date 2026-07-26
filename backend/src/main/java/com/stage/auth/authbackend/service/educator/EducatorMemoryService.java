@@ -41,6 +41,9 @@ public class EducatorMemoryService {
         CarteMemoire carte = CarteMemoire.builder()
                 .jeu(jeu)
                 .symbole(request.getSymbole())
+                .cardType(normalizeCardType(request.getCardType()))
+                .cardValue(trimToNull(request.getCardValue()))
+                .sousType(normalizeMemorySousType(request.getSousType()))
                 .pairKey(request.getPairKey())
                 .categorie(request.getCategorie())
                 .build();
@@ -58,6 +61,9 @@ public class EducatorMemoryService {
         }
         EducatorGameEditPolicy.requireDraft(carte.getJeu());
         if (request.getSymbole() != null) carte.setSymbole(request.getSymbole());
+        if (request.getCardType() != null) carte.setCardType(normalizeCardType(request.getCardType()));
+        if (request.getCardValue() != null) carte.setCardValue(trimToNull(request.getCardValue()));
+        if (request.getSousType() != null) carte.setSousType(normalizeMemorySousType(request.getSousType()));
         if (request.getPairKey() != null) carte.setPairKey(request.getPairKey());
         if (request.getCategorie() != null) carte.setCategorie(request.getCategorie());
         carte = carteMemoireRepository.save(carte);
@@ -97,8 +103,35 @@ public class EducatorMemoryService {
                 .jeuId(jeu.getId())
                 .jeuTitre(jeu.getTitre())
                 .symbole(c.getSymbole())
+                .cardType(normalizeCardType(c.getCardType()))
+                .cardValue(c.getCardValue())
+                .sousType(normalizeMemorySousType(c.getSousType()))
                 .pairKey(c.getPairKey())
                 .categorie(c.getCategorie())
                 .build();
+    }
+
+    private static String normalizeCardType(String raw) {
+        String value = trimToNull(raw);
+        if (value == null) return "EMOJI";
+        return switch (value.toUpperCase()) {
+            case "EMOJI", "TEXT", "IMAGE", "COLOR" -> value.toUpperCase();
+            default -> "EMOJI";
+        };
+    }
+
+    private static String normalizeMemorySousType(String raw) {
+        String value = trimToNull(raw);
+        if (value == null) return "DEFAULT";
+        return switch (value.toUpperCase()) {
+            case "IMAGE_WORD_PAIR", "COLOR_WORD_PAIR", "BILINGUAL_WORD_PAIR", "DEFAULT" -> value.toUpperCase();
+            default -> "DEFAULT";
+        };
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }

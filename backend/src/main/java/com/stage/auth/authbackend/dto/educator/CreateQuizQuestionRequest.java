@@ -28,6 +28,10 @@ public class CreateQuizQuestionRequest {
     /** Liste des options de réponse (QCM). Si présent, bonneReponse doit correspondre à l'une des options. */
     private java.util.List<String> options;
 
+    private String sousType;
+    private String mediaUrl;
+    private String promptAudioUrl;
+
     private String explication;
 
     private Integer difficulte;

@@ -1,19 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Save, Mail, User, Phone, Upload, Loader2, Trash2, Lock } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { ArrowLeft, Save, Mail, User, Phone, Loader2, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { userService } from '@/services/user.service';
 import storage from '@/utils/storage';
 import type { UserDTO } from '@/data/types';
 import type { UpdateProfileRequest } from '@/api/types';
 import { validateRequired, validatePhone, validateMaxLength, validateMinLength, type ValidationResult } from '@/utils/formValidation';
 
-const MAX_IMAGE_SIZE_MB = 2;
-const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp,image/gif';
-
 export default function AdminEditMyProfile() {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<UserDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,7 +21,6 @@ export default function AdminEditMyProfile() {
     nom: '',
     prenom: '',
     telephone: '',
-    avatarUrl: '',
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -47,7 +42,6 @@ export default function AdminEditMyProfile() {
             nom: d.nom ?? '',
             prenom: d.prenom ?? '',
             telephone: d.telephone ?? '',
-            avatarUrl: d.avatarUrl ?? '',
           });
           if (d.prenom != null) storage.set('auth_prenom', d.prenom);
           if (d.nom != null) storage.set('auth_nom', d.nom);
@@ -68,35 +62,6 @@ export default function AdminEditMyProfile() {
     setError(null);
     setSuccess(false);
     setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    setSuccess(false);
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Veuillez choisir une image (JPEG, PNG, WebP ou GIF).');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
-      setError(`L'image ne doit pas dépasser ${MAX_IMAGE_SIZE_MB} Mo.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const removeAvatar = () => {
-    setForm((prev) => ({ ...prev, avatarUrl: '' }));
-    setError(null);
-    setSuccess(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validate = (): boolean => {
@@ -125,7 +90,6 @@ export default function AdminEditMyProfile() {
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
         telephone: form.telephone || undefined,
-        avatarUrl: form.avatarUrl || null,
       })
       .then((updated) => {
         setSuccess(true);
@@ -168,9 +132,6 @@ export default function AdminEditMyProfile() {
       setSaving(false);
     }
   };
-
-  const avatarPreview = form.avatarUrl && (form.avatarUrl.startsWith('data:') || form.avatarUrl.startsWith('http'));
-  const avatarInitial = (profile?.prenom?.[0] || profile?.nom?.[0] || profile?.email?.[0] || '?').toUpperCase();
 
   if (loading) {
     return (
@@ -218,55 +179,6 @@ export default function AdminEditMyProfile() {
                   Profil enregistré avec succès.
                 </div>
               )}
-
-              {/* Avatar — upload depuis l'ordinateur */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-200 text-slate-700">
-                    <Mail className="w-4 h-4 opacity-0" />
-                  </span>
-                  <p className="text-sm font-semibold text-slate-800">Photo de profil</p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start gap-5">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-28 h-28 rounded-2xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-                      {avatarPreview ? (
-                        <img src={form.avatarUrl!} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-2xl font-semibold text-slate-400">{avatarInitial}</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept={ACCEPT_IMAGES}
-                        onChange={handleAvatarFile}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Choisir une image
-                      </button>
-                      {(form.avatarUrl ?? profile.avatarUrl) && (
-                        <button
-                          type="button"
-                          onClick={removeAvatar}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Supprimer
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 text-center max-w-[220px]">JPEG, PNG, WebP ou GIF. Max 2 Mo.</p>
-                  </div>
-                </div>
-              </div>
 
               <div className="border-t border-slate-200 pt-6 space-y-6">
                 <div>

@@ -28,6 +28,8 @@ public class AdminGameController {
     private final com.stage.auth.authbackend.service.admin.AiGameReviewService aiGameReviewService;
     private final com.stage.auth.authbackend.service.educator.EducatorQuestionService educatorQuestionService;
     private final com.stage.auth.authbackend.service.educator.EducatorMemoryService educatorMemoryService;
+    private final com.stage.auth.authbackend.service.educator.EducatorLogicService educatorLogicService;
+    private final com.stage.auth.authbackend.service.educator.EducatorReflexService educatorReflexService;
 
     /**
      * GET /api/admin/games
@@ -68,6 +70,24 @@ public class AdminGameController {
     @GetMapping("/{id}/memory-cards")
     public ResponseEntity<List<com.stage.auth.authbackend.dto.educator.MemoryCardDTO>> getMemoryCardsByGameId(@PathVariable Long id) {
         return ResponseEntity.ok(educatorMemoryService.listByGame(id));
+    }
+
+    /**
+     * GET /api/admin/games/{id}/logic-puzzles
+     * Liste les puzzles logiques du jeu (type LOGIQUE) pour l'admin.
+     */
+    @GetMapping("/{id}/logic-puzzles")
+    public ResponseEntity<List<com.stage.auth.authbackend.dto.educator.LogicPuzzleDTO>> getLogicPuzzlesByGameId(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorLogicService.listByGame(id));
+    }
+
+    /**
+     * GET /api/admin/games/{id}/reflex-settings
+     * Récupère les paramètres réflexe du jeu (type REFLEXE) pour l'admin.
+     */
+    @GetMapping("/{id}/reflex-settings")
+    public ResponseEntity<com.stage.auth.authbackend.dto.educator.ReflexSettingsDTO> getReflexSettingsByGameId(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorReflexService.getByGame(id));
     }
 
     /**

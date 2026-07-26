@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Play, 
-  TrendingUp, 
   Award, 
   History, 
   Star,
@@ -12,16 +11,20 @@ import {
   Trophy,
   Sparkles,
   Zap,
-  Gift
+  Gift,
+  Mic,
 } from 'lucide-react';
 import { useAuth } from '@/context';
 import userApi from '@/api/user/user.api';
 import type { GameDTO, UserDTO } from '@/api/types/api.types';
-import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
+import PlayerAppHeader from '@/components/player/PlayerAppHeader';
+import { PlayerQuizVariantChip } from '@/components/player/PlayerQuizVariant';
 import { launchPlayerGame } from './utils/launchPlayerGame';
 
 export default function PlayerDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightGameId = (location.state as { highlightGameId?: number } | null)?.highlightGameId;
   const { playerProfile } = useAuth();
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   const [availableGames, setAvailableGames] = useState<GameDTO[]>([]);
@@ -65,6 +68,68 @@ export default function PlayerDashboard() {
     }
   }, [needsOnboarding, navigate]);
 
+  useLayoutEffect(() => {
+    if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    if (highlightGameId == null) {
+      window.scrollTo(0, 0);
+    }
+    return () => {
+      if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+        history.scrollRestoration = 'auto';
+      }
+    };
+  }, [location.pathname, location.key, highlightGameId]);
+
+  const filteredGamesByType = useMemo(
+    () => availableGames.filter((g) => selectedGameType === 'ALL' || g.typeJeu === selectedGameType),
+    [availableGames, selectedGameType]
+  );
+
+  const playableGames = useMemo(() => {
+    if (!playerProfile) return availableGames;
+    return availableGames.filter((g) => {
+      const min = g.ageMin ?? 7;
+      const max = g.ageMax ?? 18;
+      return playerProfile.age >= min && playerProfile.age <= max;
+    });
+  }, [availableGames, playerProfile]);
+
+  const dashboardGamesPreview = useMemo(() => {
+    let list = filteredGamesByType;
+    if (highlightGameId != null) {
+      const highlighted = list.find((g) => g.id === highlightGameId);
+      if (highlighted) {
+        list = [highlighted, ...list.filter((g) => g.id !== highlightGameId)];
+      }
+    }
+    return list.slice(0, 6);
+  }, [filteredGamesByType, highlightGameId]);
+
+  useEffect(() => {
+    if (highlightGameId == null || availableGames.length === 0) return;
+    const game = availableGames.find((g) => g.id === highlightGameId);
+    if (game) setSelectedGameType(game.typeJeu);
+  }, [highlightGameId, availableGames]);
+
+  useEffect(() => {
+    if (highlightGameId == null || gamesLoading) return;
+    const timer = window.setTimeout(() => {
+      const catalog = document.getElementById('player-games-catalog');
+      const gameCard = document.getElementById(`player-game-${highlightGameId}`);
+      const target = gameCard ?? catalog;
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (gameCard) {
+        gameCard.classList.add('ring-2', 'ring-cyan-400', 'ring-offset-2', 'ring-offset-[#090f2b]');
+        window.setTimeout(() => {
+          gameCard.classList.remove('ring-2', 'ring-cyan-400', 'ring-offset-2', 'ring-offset-[#090f2b]');
+        }, 2800);
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [highlightGameId, gamesLoading, dashboardGamesPreview]);
+
   if (!playerProfile) return null;
 
   const niveau = playerProfile.niveau ?? playerProfile.level;
@@ -85,7 +150,6 @@ export default function PlayerDashboard() {
   const isShortAvatarText = avatarValue.length > 0 && avatarValue.length <= 2;
 
   const dashboardCards = [
-    { title: 'Progression', icon: TrendingUp, gradient: 'from-indigo-600 to-blue-600', action: () => navigate('/player/progress') },
     { title: 'Badges', icon: Award, gradient: 'from-violet-500 to-indigo-700', action: () => navigate('/player/badges') },
     { title: 'Recompenses', icon: Gift, gradient: 'from-emerald-500 to-teal-700', action: () => navigate('/player/rewards') },
     { title: 'Historique', icon: History, gradient: 'from-slate-600 to-indigo-700', action: () => navigate('/player/history') },
@@ -134,7 +198,6 @@ export default function PlayerDashboard() {
     return playerProfile.age >= min && playerProfile.age <= max;
   };
   const totalPlayableGames = availableGames.filter(canPlayByAge).length;
-  const filteredGamesByType = availableGames.filter((g) => selectedGameType === 'ALL' || g.typeJeu === selectedGameType);
   const motivationText =
     currentStreakDays >= 7
       ? 'Excellent rythme, tu es dans une dynamique de champion.'
@@ -198,6 +261,8 @@ export default function PlayerDashboard() {
       difficulty: difficultyLabel(g.difficulte) === 'Facile' ? 'Easy' : difficultyLabel(g.difficulte) === 'Moyen' ? 'Medium' : 'Hard',
       estimatedTime: `${g.dureeMinutes ?? 10} min`,
       durationMinutes: g.dureeMinutes ?? 10,
+      quizPlayMode: g.quizPlayMode ?? 'CLASSIC',
+      quizVariant: g.quizVariant ?? 'DEFAULT',
       icon: g.icone || '🎮',
     };
 
@@ -223,20 +288,13 @@ export default function PlayerDashboard() {
       <div className="pointer-events-none absolute top-40 -right-20 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-20 left-1/3 h-60 w-60 rounded-full bg-amber-500/10 blur-3xl" />
 
-      <header className="sticky top-0 z-30 border-b border-indigo-400/20 bg-[#060918]/85 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/40">
-              <span className="text-2xl">🎮</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-extrabold text-white tracking-tight">EduGame AI</h1>
-              <p className="text-xs text-indigo-200/80">Espace Joueur</p>
-            </div>
-          </div>
-          <PlayerHeaderActions />
-        </div>
-      </header>
+      <PlayerAppHeader
+        searchGames={playableGames}
+        notificationGames={availableGames}
+        onSelectGame={(game) => {
+          void launchGameFromCard(game);
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -263,14 +321,24 @@ export default function PlayerDashboard() {
                     {motivationText}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/player/new-game')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-indigo-700 font-extrabold px-4 py-2.5 text-sm shadow-lg shadow-indigo-950/30 hover:bg-indigo-50 transition-colors"
-                >
-                  <Zap className="h-4 w-4" />
-                  Jouer maintenant
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/player/new-game')}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-indigo-700 font-extrabold px-4 py-2.5 text-sm shadow-lg shadow-indigo-950/30 hover:bg-indigo-50 transition-colors"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Jouer maintenant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/player/voice')}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300/40 bg-rose-500/15 text-rose-100 font-extrabold px-4 py-2.5 text-sm hover:bg-rose-500/25 transition-colors"
+                  >
+                    <Mic className="h-4 w-4" />
+                    Atelier oral
+                  </button>
+                </div>
               </div>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -344,7 +412,10 @@ export default function PlayerDashboard() {
           </motion.div>
         </section>
 
-        <section className="rounded-3xl border border-fuchsia-300/20 bg-gradient-to-b from-[#0f1438]/95 to-[#090f2b]/95 p-4 md:p-5">
+        <section
+          id="player-games-catalog"
+          className="scroll-mt-24 rounded-3xl border border-fuchsia-300/20 bg-gradient-to-b from-[#0f1438]/95 to-[#090f2b]/95 p-4 md:p-5"
+        >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-extrabold text-white">Jeux disponibles</h2>
               <button type="button" onClick={() => navigate('/player/new-game')} className="text-sm font-semibold text-cyan-300 hover:text-cyan-200">
@@ -372,10 +443,14 @@ export default function PlayerDashboard() {
               <div className="rounded-2xl p-6 border border-white/15 text-slate-300 bg-white/5">Aucun jeu disponible dans cette section.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                {filteredGamesByType.slice(0, 6).map((g) => {
+                {dashboardGamesPreview.map((g) => {
                   const isAllowedByAge = canPlayByAge(g);
                   return (
-                    <article key={g.id} className="min-w-0 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.03] border border-white/15 overflow-hidden transition-all duration-200 flex flex-col hover:border-cyan-300/60 hover:-translate-y-1 hover:shadow-lg hover:shadow-cyan-900/20">
+                    <article
+                      key={g.id}
+                      id={`player-game-${g.id}`}
+                      className="min-w-0 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.03] border border-white/15 overflow-hidden transition-all duration-200 flex flex-col hover:border-cyan-300/60 hover:-translate-y-1 hover:shadow-lg hover:shadow-cyan-900/20"
+                    >
                       <div className="relative h-32 overflow-hidden">
                         {g.coverImageUrl ? (
                           <img src={g.coverImageUrl} alt={`Illustration ${formatType(g.typeJeu)}`} className="absolute inset-0 w-full h-full object-cover" />
@@ -389,14 +464,17 @@ export default function PlayerDashboard() {
                           <h3 className="font-bold text-white leading-tight line-clamp-2">{g.titre}</h3>
                           <span className={`text-[11px] px-2 py-0.5 rounded-full border ${difficultyClass(g.difficulte)}`}>{difficultyLabel(g.difficulte)}</span>
                         </div>
-                        <div className="mb-3">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${
-                            g.modeJeu === 'COLLECTIF'
+                            g.modeJeu === 'EN_LIGNE'
                               ? 'bg-violet-500/20 text-violet-200 border-violet-300/40'
                               : 'bg-cyan-500/20 text-cyan-200 border-cyan-300/40'
                           }`}>
-                            Mode: {g.modeJeu === 'COLLECTIF' ? 'Équipe' : 'Solo'}
+                            Mode: {g.modeJeu === 'EN_LIGNE' ? 'Solo en ligne · contre adversaires' : 'Solo'}
                           </span>
+                          {g.typeJeu === 'QUIZ' && (
+                            <PlayerQuizVariantChip variant={g.quizVariant ?? 'DEFAULT'} />
+                          )}
                         </div>
                         <p className="text-sm text-slate-300 line-clamp-2 min-h-[44px]">{g.description || 'Jeu educatif.'}</p>
                         <div className="mt-3 text-xs text-slate-300">{g.dureeMinutes ?? 10} min • {g.ageMin ?? 7}-{g.ageMax ?? 18} ans</div>
@@ -456,13 +534,13 @@ export default function PlayerDashboard() {
             <span className="text-indigo-200 font-semibold inline-flex items-center gap-2"><Play className="w-4 h-4" /> Commencer</span>
           </motion.div>
 
-          <motion.div whileHover={{ y: -5 }} onClick={() => navigate('/player/new-game', { state: { mode: 'Collective' } })} className="rounded-2xl border border-indigo-300/20 bg-gradient-to-br from-slate-800/80 to-indigo-950/80 p-6 cursor-pointer">
+          <motion.div whileHover={{ y: -5 }} onClick={() => navigate('/player/new-game', { state: { mode: 'Online' } })} className="rounded-2xl border border-indigo-300/20 bg-gradient-to-br from-slate-800/80 to-indigo-950/80 p-6 cursor-pointer">
             <div className="w-14 h-14 bg-gradient-to-br from-slate-600 to-indigo-700 rounded-xl flex items-center justify-center mb-4">
               <Users className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">Mode Equipe</h3>
-            <p className="text-slate-300 mb-4">Collaboration en temps reel et challenge collectif.</p>
-            <span className="text-indigo-200 font-semibold inline-flex items-center gap-2"><Play className="w-4 h-4" /> Jouer ensemble</span>
+            <h3 className="text-xl font-bold text-white mb-1">Solo en ligne</h3>
+            <p className="text-slate-300 mb-4">Affronte d’autres joueurs : chacun joue seul et le meilleur score gagne.</p>
+            <span className="text-indigo-200 font-semibold inline-flex items-center gap-2"><Play className="w-4 h-4" /> Affronter des joueurs</span>
           </motion.div>
         </section>
 

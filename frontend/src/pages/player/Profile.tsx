@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, User as UserIcon, Mail, Calendar, Star, Trophy, Save, Eye, EyeOff, MapPin, Globe, Map, Info } from 'lucide-react';
 import { useAuth } from '@/context';
 import geoApi from '@/api/geo/countriesNow.api';
 import userApi from '@/api/user/user.api';
+import type { PlayerBadgesOverviewDTO, PlayerProgressOverviewDTO } from '@/api/types/api.types';
 import PlayerHeaderActions from '@/components/player/PlayerHeaderActions';
 import { getErrorMessage } from '@/utils/errorHandler';
 import GuidedTour, { TourStep } from '@/components/features/player/GuidedTour';
@@ -27,6 +28,9 @@ export default function Profile() {
   const [regionsList, setRegionsList] = useState<string[]>([]);
   const [loadingGeo, setLoadingGeo] = useState(false);
   const [loadingRegions, setLoadingRegions] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [progressOverview, setProgressOverview] = useState<PlayerProgressOverviewDTO | null>(null);
+  const [badgesOverview, setBadgesOverview] = useState<PlayerBadgesOverviewDTO | null>(null);
 
   const [formData, setFormData] = useState({
     name: playerProfile?.name || '',
@@ -40,7 +44,7 @@ export default function Profile() {
   });
 
   const avatarOptions = ['👦', '👧', '🧒', '👨', '👩', '🧑', '👱', '🧔'];
-  const [selectedAvatar, setSelectedAvatar] = useState(playerProfile?.avatar || '👦');
+  const [selectedAvatar, setSelectedAvatar] = useState(playerProfile?.avatar || '');
   const hasFetchedProfileRef = useRef(false);
   const avatarValue = (selectedAvatar || '').trim();
   const isImageAvatar =
@@ -65,6 +69,36 @@ export default function Profile() {
   }, [refreshUser]);
 
   useEffect(() => {
+    if (!playerProfile) {
+      setStatsLoading(false);
+      setProgressOverview(null);
+      setBadgesOverview(null);
+      return;
+    }
+    let cancelled = false;
+    setStatsLoading(true);
+    Promise.all([
+      userApi.getProgressOverview(),
+      userApi.getBadgesOverview(),
+    ])
+      .then(([progressRes, badgesRes]) => {
+        if (cancelled) return;
+        setProgressOverview(progressRes.data);
+        setBadgesOverview(badgesRes.data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProgressOverview(null);
+          setBadgesOverview(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [playerProfile?.id]);
+
+  useEffect(() => {
     setLoadingGeo(true);
     geoApi.getCountries()
       .then(setPaysList)
@@ -82,7 +116,7 @@ export default function Profile() {
       regionNom: playerProfile.regionNom || '',
       email: user?.email || prev.email,
     }));
-    setSelectedAvatar(playerProfile.avatar || '👦');
+    setSelectedAvatar(playerProfile.avatar || '');
   }, [playerProfile, user?.email]);
 
   useEffect(() => {
@@ -125,6 +159,7 @@ export default function Profile() {
       const paysNom = formData.paysNom.trim();
       const regionNom = formData.regionNom.trim();
       const hasLocation = Boolean(paysNom && regionNom);
+      const avatarToSave = selectedAvatar.trim() || undefined;
 
       // Enregistrer la localisation dès qu'elle est renseignée
       // (premier onboarding ou mise à jour ultérieure du profil).
@@ -132,40 +167,54 @@ export default function Profile() {
         await userApi.completeOnboarding({
           paysNom,
           regionNom,
-          avatarUrl: selectedAvatar
+          ...(avatarToSave ? { avatarUrl: avatarToSave } : {}),
         });
-        // Double sécurité: persister explicitement l'avatar via update-profile
-        // pour couvrir les cas où l'onboarding ne met pas à jour l'avatar.
-        await userApi.updateProfile({
-          avatarUrl: selectedAvatar,
-        });
+        if (avatarToSave) {
+          await userApi.updateProfile({ avatarUrl: avatarToSave });
+        }
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('player_pays_nom', paysNom);
           localStorage.setItem('player_region_nom', regionNom);
-          localStorage.setItem('player_avatar', selectedAvatar);
+          if (avatarToSave) {
+            localStorage.setItem('player_avatar', avatarToSave);
+          }
         }
         updatePlayerProfile({
           paysNom,
           regionNom,
-          avatar: selectedAvatar,
+          ...(avatarToSave ? { avatar: avatarToSave } : {}),
           onboardingCompleted: true,
         });
-      } else {
-        await userApi.updateProfile({
-          avatarUrl: selectedAvatar,
-        });
+      } else if (avatarToSave) {
+        await userApi.updateProfile({ avatarUrl: avatarToSave });
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('player_avatar', selectedAvatar);
+          localStorage.setItem('player_avatar', avatarToSave);
         }
-        updatePlayerProfile({
-          avatar: selectedAvatar,
-        });
+        updatePlayerProfile({ avatar: avatarToSave });
       }
 
       toast.success('Profil mis à jour avec succès !');
       await refreshUser?.();
+      try {
+        const [progressRes, badgesRes] = await Promise.all([
+          userApi.getProgressOverview(),
+          userApi.getBadgesOverview(),
+        ]);
+        setProgressOverview(progressRes.data);
+        setBadgesOverview(badgesRes.data);
+      } catch {
+        // Les stats restent affichées avec les dernières valeurs connues.
+      }
       setIsEditing(false);
       setIsTourActive(false);
+
+      const isOnboardingFlow =
+        new URLSearchParams(location.search).get('onboarding') === 'true' ||
+        !playerProfile?.onboardingCompleted;
+      if (isOnboardingFlow && hasLocation) {
+        navigate('/player/dashboard', { replace: true });
+        return;
+      }
     } catch (err) {
       toast.error(getErrorMessage(err, 'Erreur lors de la mise à jour'));
     } finally {
@@ -184,7 +233,7 @@ export default function Profile() {
     {
       targetId: 'avatar-list',
       title: 'Personnalisation',
-      content: 'Vous pouvez maintenant choisir un avatar ! Cette étape est optionnelle, vous pouvez cliquer sur Suivant à tout moment.',
+      content: 'Vous pouvez choisir un avatar emoji si vous le souhaitez. Cette étape est entièrement optionnelle.',
       position: 'bottom',
       disableNext: false
     },
@@ -198,6 +247,12 @@ export default function Profile() {
   ];
 
   if (!playerProfile) return null;
+
+  const totalSessions = progressOverview?.totalSessions ?? playerProfile.totalSessions ?? 0;
+  const totalScore = playerProfile.scoreTotal ?? playerProfile.totalScore ?? 0;
+  const averageSuccessRate =
+    progressOverview?.avgSuccessRate ?? playerProfile.averageSuccessRate ?? 0;
+  const badgesEarned = badgesOverview?.earned ?? playerProfile.badgesEarned ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-x-hidden">
@@ -272,7 +327,7 @@ export default function Profile() {
                 ) : isShortAvatarText ? (
                   avatarValue
                 ) : (
-                  '👦'
+                  <UserIcon className="w-12 h-12 text-white/80" />
                 )}
               </div>
               <div className="flex-1">
@@ -321,7 +376,7 @@ export default function Profile() {
                         key={avatar}
                         whileHover={{ scale: 1.05, y: -4 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => setSelectedAvatar(avatar)}
+                        onClick={() => setSelectedAvatar(selectedAvatar === avatar ? '' : avatar)}
                         className={`group relative w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl transition-all duration-300 ${
                           selectedAvatar === avatar
                             ? 'bg-white border-[3px] border-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] ring-4 ring-indigo-50 scale-110 z-10'
@@ -345,7 +400,7 @@ export default function Profile() {
                       </motion.button>
                     ))}
                   </div>
-                  
+
                   {/* Recommendation under avatar */}
                   <motion.div 
                     initial={{ opacity: 0, x: -10 }}
@@ -354,7 +409,7 @@ export default function Profile() {
                   >
                     <Info className="w-5 h-5 text-amber-600 mt-0.5" />
                     <p className="text-sm text-amber-800">
-                      <strong>Recommandation :</strong> Choisissez un avatar qui représente le mieux votre personnalité de joueur pour vous démarquer dans le classement !
+                      <strong>Optionnel :</strong> Choisissez un emoji pour personnaliser votre profil, ou passez cette étape. Cliquez à nouveau sur un emoji sélectionné pour le retirer.
                     </p>
                   </motion.div>
                 </div>
@@ -557,19 +612,25 @@ export default function Profile() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-center flex flex-col items-center">
               <p className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Sessions Totales</p>
-              <p className="text-3xl font-black text-purple-600">{playerProfile.totalSessions}</p>
+              <p className="text-3xl font-black text-purple-600">{statsLoading ? '—' : totalSessions.toLocaleString('fr-FR')}</p>
             </div>
             <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 text-center flex flex-col items-center">
               <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Score Total</p>
-              <p className="text-3xl font-black text-blue-600">{playerProfile.totalScore.toLocaleString()}</p>
+              <p className="text-3xl font-black text-blue-600">{statsLoading ? '—' : totalScore.toLocaleString('fr-FR')}</p>
             </div>
             <div className="p-6 bg-green-50 rounded-2xl border border-green-100 text-center flex flex-col items-center">
               <p className="text-xs font-bold text-green-400 uppercase tracking-wider mb-2">Taux de Réussite</p>
-              <p className="text-3xl font-black text-green-600">{playerProfile.averageSuccessRate}%</p>
+              <p className="text-3xl font-black text-green-600">{statsLoading ? '—' : `${averageSuccessRate}%`}</p>
             </div>
             <div className="p-6 bg-yellow-50 rounded-2xl border border-yellow-100 text-center flex flex-col items-center">
               <p className="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-2">Badges</p>
-              <p className="text-3xl font-black text-yellow-600">{playerProfile.badgesEarned}</p>
+              <p className="text-3xl font-black text-yellow-600">
+                {statsLoading
+                  ? '—'
+                  : badgesOverview
+                    ? `${badgesEarned} / ${badgesOverview.total}`
+                    : badgesEarned.toLocaleString('fr-FR')}
+              </p>
             </div>
           </div>
         </motion.div>

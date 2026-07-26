@@ -21,18 +21,6 @@ export function validateMinLength(value: string, min: number, message?: string):
   return value.length < min ? msg : null;
 }
 
-export function validateNumberRange(
-  value: number | string,
-  min: number,
-  max: number,
-  message?: string
-): string | null {
-  const n = typeof value === 'string' ? parseInt(value, 10) : value;
-  if (Number.isNaN(n)) return message ?? 'Valeur numérique invalide';
-  if (n < min || n > max) return message ?? `Entre ${min} et ${max}`;
-  return null;
-}
-
 export function validateNonNegativeNumber(value: number | string, message = 'Doit être ≥ 0'): string | null {
   const n = typeof value === 'string' ? (value.trim() === '' ? NaN : Number(value)) : value;
   if (Number.isNaN(n)) return null; // vide autorisé si optionnel

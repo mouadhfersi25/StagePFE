@@ -331,6 +331,9 @@ public class PlayerController {
                 .contenu(question.getContenu())
                 .bonneReponse(question.getBonneReponse())
                 .options(jsonToOptions(question.getOptions()))
+                .sousType(question.getSousType())
+                .mediaUrl(question.getMediaUrl())
+                .promptAudioUrl(question.getPromptAudioUrl())
                 .explication(question.getExplication())
                 .difficulte(question.getDifficulte())
                 .build();
@@ -342,6 +345,9 @@ public class PlayerController {
                 .jeuId(jeu.getId())
                 .jeuTitre(jeu.getTitre())
                 .symbole(card.getSymbole())
+                .cardType(card.getCardType())
+                .cardValue(card.getCardValue())
+                .sousType(card.getSousType())
                 .pairKey(card.getPairKey())
                 .categorie(card.getCategorie())
                 .build();

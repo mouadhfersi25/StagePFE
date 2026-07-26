@@ -1,11 +1,16 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { authService } from "../../../services/auth.service";
 import { validateEmail, validatePassword, validateName, validatePhone, validateDate } from "../../../utils/validators";
 import { formStyles } from "../../../styles/formStyles";
 import { useInputFocus } from "../../../hooks/useInputFocus";
 import { getErrorMessage, isTimeoutError } from "../../../utils/errorHandler";
 
+const REGISTRATION_SUCCESS_MESSAGE =
+  "Inscription réussie ! Vérifiez votre email pour activer votre compte.";
+
 export default function RegisterForm() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     nom: "",
     prenom: "",
@@ -15,20 +20,10 @@ export default function RegisterForm() {
     dateDeNaissance: "",
   });
 
-  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const { focusedField, handleFocus, handleBlur } = useInputFocus();
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => setProfileImage(reader.result as string);
-    reader.readAsDataURL(file);
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -36,7 +31,6 @@ export default function RegisterForm() {
     if (errors[name]) {
       setErrors({ ...errors, [name]: null });
     }
-    if (msg) setMsg(null);
     if (error) setError(null);
   };
 
@@ -94,7 +88,6 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setMsg(null);
 
     if (!validateForm()) {
       setError("Veuillez corriger les erreurs dans le formulaire");
@@ -104,7 +97,7 @@ export default function RegisterForm() {
     setLoading(true);
 
     try {
-      const registerData: { nom: string; prenom: string; email: string; password: string; dateDeNaissance: string; telephone?: string; avatarUrl?: string } = {
+      const registerData: { nom: string; prenom: string; email: string; password: string; dateDeNaissance: string; telephone?: string } = {
         nom: form.nom.trim(),
         prenom: form.prenom.trim(),
         email: form.email.trim().toLowerCase(),
@@ -116,36 +109,21 @@ export default function RegisterForm() {
       if (phoneTrimmed && phoneTrimmed.length === 8 && /^[0-9]{8}$/.test(phoneTrimmed)) {
         registerData.telephone = phoneTrimmed;
       }
-      if (profileImage) {
-        registerData.avatarUrl = profileImage;
-      }
 
       await authService.register(registerData);
-      setMsg("Inscription réussie ! Vérifiez votre email pour activer votre compte.");
-      
-      setForm({
-        nom: "",
-        prenom: "",
-        email: "",
-        password: "",
-        telephone: "",
-        dateDeNaissance: "",
+      navigate("/login", {
+        replace: true,
+        state: { message: REGISTRATION_SUCCESS_MESSAGE },
       });
-      setProfileImage(null);
-      setErrors({});
     } catch (err) {
       if (isTimeoutError(err)) {
-        setMsg("✅ Ton compte a peut-être été créé ! Vérifie ton email pour confirmer l'inscription. Si tu ne reçois pas d'email, réessaie dans quelques instants.");
-        setForm({
-          nom: "",
-          prenom: "",
-          email: "",
-          password: "",
-          telephone: "",
-          dateDeNaissance: "",
+        navigate("/login", {
+          replace: true,
+          state: {
+            message:
+              "Ton compte a peut-être été créé. Vérifie ton email pour confirmer l'inscription.",
+          },
         });
-        setProfileImage(null);
-        setErrors({});
         return;
       }
       
@@ -196,12 +174,6 @@ export default function RegisterForm() {
           <span>Création d'un compte <strong>Joueur</strong> pour accéder aux jeux éducatifs</span>
         </div>
 
-        {msg && (
-          <div style={styles.success}>
-            <span style={{ fontSize: "20px" }}>✅</span>
-            <span>{msg}</span>
-          </div>
-        )}
         {error && (
           <div style={styles.error}>
             <span style={{ fontSize: "20px" }}>⚠️</span>
@@ -275,72 +247,6 @@ export default function RegisterForm() {
             />
           </div>
           {errors.telephone && <span style={styles.errorText}>⚠️ {errors.telephone}</span>}
-        </div>
-
-        {/* Photo de profil (optionnel) - peut être changée en avatar depuis le dashboard */}
-        <div style={styles.formGroup}>
-          <label style={styles.label}>
-            <span style={styles.labelIcon}>📷</span>
-            <span>Photo de profil <span style={styles.optional}>(optionnel)</span></span>
-          </label>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            {profileImage ? (
-              <>
-                <img
-                  src={profileImage}
-                  alt="Aperçu"
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                    border: "3px solid rgba(99, 102, 241, 0.4)",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setProfileImage(null)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid #ef4444",
-                    background: "rgba(239, 68, 68, 0.1)",
-                    color: "#ef4444",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                  }}
-                >
-                  Retirer la photo
-                </button>
-              </>
-            ) : null}
-            <label style={{ cursor: "pointer" }}>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                style={{ display: "none" }}
-              />
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "10px 18px",
-                  borderRadius: "10px",
-                  border: "2px dashed rgba(99, 102, 241, 0.4)",
-                  background: "rgba(99, 102, 241, 0.06)",
-                  color: "#6366f1",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                }}
-              >
-                {profileImage ? "Changer la photo" : "Choisir une photo"}
-              </span>
-            </label>
-          </div>
-          <small style={{ color: "#6b7280", fontSize: "12px", marginTop: "6px", display: "block" }}>
-            Tu pourras aussi choisir un avatar (emoji) depuis ton espace après inscription.
-          </small>
         </div>
 
         {/* Bouton */}

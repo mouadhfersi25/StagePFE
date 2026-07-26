@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Globe, Bell, Settings, LogOut, User } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context';
 import storage from '@/utils/storage';
 import educatorApi from '@/api/educator/educator.api';
@@ -115,9 +115,11 @@ export default function EducatorHeader() {
   return (
     <header className="fixed top-0 left-64 right-0 z-40 border-b border-emerald-100/70 bg-white/85 backdrop-blur-xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between gap-4 px-5 md:px-8 py-3.5">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Education</p>
-          <h2 className="text-sm md:text-base font-bold text-slate-900">Bonjour, {displayName}</h2>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Education</p>
+            <h2 className="text-sm md:text-base font-bold text-slate-900 truncate">Bonjour, {displayName}</h2>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors border border-transparent hover:border-slate-200" title="Langue">
